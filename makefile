@@ -3,6 +3,8 @@
 REQUIRED_BINS := qemu-system-i386
 $(foreach bin,$(REQUIRED_BINS), $(if $(shell command -v $(bin) 2> /dev/null),$(true),$(error Please install `$(bin)`)))
 
+KERNEL_FLAGS = -fno-pie -nostdinc -std=gnu99 -fomit-frame-pointer -fno-builtin -nodefaultlibs -nostdlib -ffreestanding
+
 .PHONY : clean all run debug
 
 # Create the build directory
@@ -13,8 +15,13 @@ build:
 build/bootloader.bin: build src/boot.asm
 	nasm -f bin src/boot.asm -o build/bootloader.bin
 
+build/kernel.bin: build src/linker.ld src/kernel.c
+	gcc -m32 -c src/kernel.c $(KERNEL_FLAGS) -O2 -Wall -Wextra -o build/kernel.o
+	objcopy --remove-section .eh_frame --remove-section .rel.eh_frame --remove-section .rela.eh_frame build/kernel.o build/kernel.o
+	ld -nostdlib -m elf_i386 -T src/linker.ld -o build/kernel.bin build/kernel.o
+
 # Create the floppy disc image 940
-build/floppy.img: build build/bootloader.bin src/tailcap
+build/floppy.img: build build/bootloader.bin src/tailcap build/kernel.bin
 	dd if=/dev/zero of=build/floppy.img bs=1024 count=1440
 	dd if=build/bootloader.bin of=build/floppy.img seek=0 count=1 conv=notrunc
 	dd if=/dev/zero of=build/floppy.img seek=1 count=10 conv=notrunc

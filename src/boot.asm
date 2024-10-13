@@ -5,7 +5,6 @@ cpu 386
 %define err_guard 1 ; Bootloader integrity self-check failed
 %define err_scan  2 ; "Get Current Drive Parameters" BIOS call failed
 %define err_load  3 ; "Read Sectors into Memory" BIOS call failed
-%define err_a20   4 ; Failed to anable A20 gate
 
 section .text
 [org 0x7c00]
@@ -38,41 +37,23 @@ main:
 	mov al, [guard]
 	mov ah, 42
 
+	; Check integrity
 	cmp al, ah
-	je main_ok
-
-		; Bootloader self-check failed, print error and halt
-		mov ax, err_guard
-		call fault
-
-	main_ok:
+	mov ax, err_guard
+	jne fault
 
 	; Print boot drive
-	mov si, str_boot_drive
-	call prints
-
-	; Print drive handle
 	xor ah, ah
 	mov al, [drive_handle]
-	call printd
-	call printn
+	mov si, str_boot_drive
+	call printl
 
-	; Get drive geometry
-	call scan
-
-	; Copy drive into RAM
-	call load
-
-	; Enable A20 gate
-	call a20
-
-
+	call scan ; Get drive geometry
+	call load ; Copy drive into RAM
+	call a20  ; Enable A20 gate
 
 	; Wait forever
-	main_stop:
-		cli
-		hlt
-	jmp main_stop
+	call halt
 
 a20:
 
@@ -116,13 +97,8 @@ scan:
 	mov dl, [drive_handle]
 
 	int 0x13
-	jnc scan_ok
-
-		; Print error message and halt
-		mov ax, err_scan
-		call fault
-
-	scan_ok:
+	mov ax, err_scan
+	jc fault
 
 	; Two high cylinders bits are stored in DH, get rid of them
 	and dh, 0x3F
@@ -216,13 +192,8 @@ load:
 		mov dl, [drive_handle]
 
 		int 0x13
-		jnc load_ok
-
-			; Print error message and halt
-			mov ax, err_load
-			call fault
-
-		load_ok:
+		mov ax, err_load
+		jc fault
 
 	cmp si, 70
 	jnz load_next
@@ -236,11 +207,11 @@ fault:
 	mov si, str_fault
 	call printl
 
-	; Wait forever
-	fault_halt:
-		cli
-		hlt
-	jmp fault_halt
+; Wait forever
+halt:
+	cli
+	hlt
+	jmp halt
 
 ; Prints DS:SI null-terminated string folowed by AX decimal number and new line
 printl:
@@ -338,8 +309,7 @@ section .data
 	str_fault:       db "Boot Fault: ", 0
 	str_boot_drive:  db "Boot Drive: ", 0
 	str_copying:     db 13, "Copying ", 0
-	str_of:          db " of ", 0
-	str_sectors:     db " * Sectors   : ", 0
+	str_sectors:     db " * Sections  : ", 0
 	str_heads:       db " * Heads     : ", 0
 	str_cylinders:   db " * Cylinders : ", 0
 	str_stride:      db " * Stride    : ", 0
