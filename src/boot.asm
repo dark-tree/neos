@@ -5,6 +5,7 @@ cpu 386
 %define err_guard 1 ; Bootloader integrity self-check failed
 %define err_scan  2 ; "Get Current Drive Parameters" BIOS call failed
 %define err_load  3 ; "Read Sectors into Memory" BIOS call failed
+%define err_a20   4 ; Failed to anable A20 gate
 
 section .text
 [org 0x7c00]
@@ -62,11 +63,50 @@ main:
 	; Copy drive into RAM
 	call load
 
+	; Enable A20 gate
+	call a20
+
+
+
 	; Wait forever
 	main_stop:
 		cli
 		hlt
 	jmp main_stop
+
+a20:
+
+	; Access to 0xEE enables A20 on some systems
+	; As we need just one instruction to do this we might as well
+	in al, 0xEE
+
+	; Try enabling A20 using the keyboard controller
+	; Disable keyboard
+	call kwait
+	mov al, 0xAD
+	out 0x64, al
+
+	; Set the keyboard controller output port
+	call kwait
+	mov al, 0xD1
+	out 0x64, al
+
+	; Enable all bits in Controller Output Port, including A20
+	call kwait
+	mov al, 0xFF
+	out 0x60, al
+
+	; Enable keyboard
+	call kwait
+	mov al, 0xAE
+	out 0x64, al
+
+; Wait for keyboard to report ready for a write to 0x64/0x60
+kwait:
+	in al, 0x64 ; Read keyboard status register
+	test al, 2  ; Check input buffer status
+	jnz kwait   ; Retry until full
+	ret
 
 ; Reads current drive parameters into global bootloader variables
 scan:
