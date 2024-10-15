@@ -1,13 +1,19 @@
 
 cpu 386
-[bits 16]
+bits 16
+
+global prints
+global printd
+global printn
+global printl
+global halt
+global fault
 
 %define err_guard 1 ; Bootloader integrity self-check failed
 %define err_scan  2 ; "Get Current Drive Parameters" BIOS call failed
 %define err_load  3 ; "Read Sectors into Memory" BIOS call failed
 
 section .text
-[org 0x7c00]
 
 main:
 
@@ -52,8 +58,8 @@ main:
 	call load ; Copy drive into RAM
 	call a20  ; Enable A20 gate
 
-	; Wait forever
-	call halt
+	; Continue to start.asm
+	jmp 0x7e00
 
 a20:
 

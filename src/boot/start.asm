@@ -1,3 +1,14 @@
+
+cpu 386
+bits 16
+
+extern prints
+extern printd
+extern printn
+extern printl
+extern halt
+extern fault
+
 ; + ---------- + -- + -- + -- + -- + ----------- + -- + ----- + -- + ---- + ---------- +
 ; | 31      24 | 23 | 22 | 21 | 20 | 19       16 | 15 | 14 13 | 12 | 11 8 | 7        0 |
 ; + ---------- + -- + -- + -- + -- + ----------- + -- + ----- + -- + ---- + ---------- + (+4)
@@ -20,24 +31,37 @@
 ; Limit - 20 bit
 ; Base  - 32 bit
 
+section .text
+
+start:
+	mov si, str_fault
+	call printn
+	call prints
+
+	call halt
+
+section .data
+
+	str_fault:       db "Hello from linked start stage!", 0
+
 ; Dummy segment
-mov [0x500], dword 0
-mov [0x504], dword 0
+;mov [0x500], dword 0
+;mov [0x504], dword 0
 
 ; Code segment
 ; [31:16] Base 0x????0000
 ; [16:00] Limit 0x?FFFF
-mov [0x508], dword 0x0000FFFF
+;mov [0x508], dword 0x0000FFFF
 
 ; [31:16] Base 0x00??????, Gr=1, Db=1, Lo=0, Av=0, Limit 0xF????
 ; [16:00] Pr=1 Ring=00, Dt=1, Type=0b1011 [ECRA], Base=0x??00????
-mov [0x50C], dword 0x00CF9B00
+;mov [0x50C], dword 0x00CF9B00
 
 ; Data segment
 ; [31:16] Base 0x????0000
 ; [16:00] Limit 0x?FFFF
-mov [0x510], dword 0x0000FFFF
+;mov [0x510], dword 0x0000FFFF
 
 ; [31:16] Base 0x00??????, Gr=1, Db=1, Lo=0, Av=0, Limit 0xF????
 ; [16:00] Pr=1 Ring=00, Dt=1, Type=0b0011 [EDWA], Base=0x??00????
-mov [0x514], dword 0x00CF9300
+;mov [0x514], dword 0x00CF9300
