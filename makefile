@@ -40,6 +40,7 @@ build/floppy.img: build build/boot/load.bin build/boot/start.bin build/kernel/ke
 	dd if=/dev/zero of=build/floppy.img bs=1024 count=1440
 	dd if=build/boot/load.bin of=build/floppy.img bs=512 seek=0 count=1 conv=notrunc
 	dd if=build/boot/start.bin of=build/floppy.img bs=512 seek=1 count=1 conv=notrunc
+	dd if=build/kernel/kernel.bin of=build/floppy.img bs=512 seek=2 count=100 conv=notrunc
 
 # Wrap into a ISO image file
 build/final.iso: build build/floppy.img

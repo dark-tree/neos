@@ -40,11 +40,11 @@ main:
 	mov sp, ax
 
 	; Make sure the bootloadred wasn't truncated
-	mov al, [guard]
-	mov ah, 42
+	mov ax, [guard]
+	mov bx, 0xAA55
 
 	; Check integrity
-	cmp al, ah
+	cmp ax, bx
 	mov ax, err_guard
 	jne fault
 
@@ -320,5 +320,6 @@ section .data
 	str_cylinders:   db " * Cylinders : ", 0
 	str_stride:      db " * Stride    : ", 0
 
-	; Checked on start to make sure the bootlaoder wasn't truncated
-	guard:           db 42
+	; Bootloader signature
+	;times 510-($-$$) db 0
+	guard: dw 0xAA55
