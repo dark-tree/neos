@@ -23,16 +23,21 @@ build/boot/load.bin: build src/boot/load.asm src/link/load.ld
 	$(AS) src/boot/load.asm -o build/boot/load.o
 	$(LD) -T src/link/load.ld -o build/boot/load.elf build/boot/load.o
 	$(OC) build/boot/load.elf build/boot/load.bin
-
+	
 # Compile the bootloader, second stage
 build/boot/start.bin: build src/boot/start.asm src/link/start.ld build/boot/load.bin
 	$(AS) src/boot/start.asm -o build/boot/start.o
 	$(LD) -T src/link/start.ld -o build/boot/start.elf build/boot/start.o
 	$(OC) build/boot/start.elf build/boot/start.bin
 
+build/kernel/kmalloc.o: build src/kernel/kmalloc.asm
+	 $(AS) src/kernel/kmalloc.asm -o build/kernel/kmalloc.o
+
+build/kernel/entry.o: build src/kernel/entry.c
+	 $(CC) -c src/kernel/entry.c -o build/kernel/entry.o
+
 # Compile the kernel to a flat binary
-build/kernel/kernel.bin: build src/link/kernel.ld src/kernel/entry.c
-	$(CC) -c src/kernel/entry.c -o build/kernel/entry.o
+build/kernel/kernel.bin: build src/link/kernel.ld build/kernel/entry.o build/kernel/kmalloc.o
 	$(LD) -T src/link/kernel.ld -o build/kernel/kernel.bin
 
 # Create the floppy disc system image

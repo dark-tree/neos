@@ -1,7 +1,10 @@
 
 #include "types.h"
 
+
 volatile bool truth = true;
+
+extern char test();
 
 void start() {
 	uint16_t volatile* screen = (uint16_t*) 0xB8000;
@@ -12,7 +15,7 @@ void start() {
 
 			__asm ("nop");
 
-			chr[0] = 'N';
+			chr[0] = test();
 			chr[1] = 0b01001001;
 		}
 	}
