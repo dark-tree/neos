@@ -3,6 +3,8 @@ ENTRY(start)
 /* Files that need to be linked together */
 INPUT(build/kernel/entry.o)
 INPUT(build/kernel/kmalloc.o)
+INPUT(build/kernel/console.o)
+INPUT(build/kernel/memory.o)
 
 SECTIONS {
 	. = 0x8000;
