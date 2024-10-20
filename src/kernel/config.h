@@ -16,3 +16,9 @@
  *        the equivalent in spaces of the tab character.
  */
 #define CONSOLE_TAB_DISTANCE 4
+
+/**
+ * @brief The maximum length of a number, in digits, as
+ *        as printed by kprintf() (for any base)
+ */
+#define KPRINTF_MAX_DIGITS 64

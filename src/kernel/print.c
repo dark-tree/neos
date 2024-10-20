@@ -1,6 +1,7 @@
 #include "print.h"
 #include "console.h"
 #include "types.h"
+#include "config.h"
 
 /* private */
 
@@ -19,8 +20,9 @@ void kprint_string(const char* string) {
 void kprint_integer(long integer, int base) {
 	const char digits[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-	char buffer[64] = {0};
-	int i = 30;
+	char buffer[KPRINTF_MAX_DIGITS] = {0};
+	int i = KPRINTF_MAX_DIGITS - 2;
+	//buffer[i] = 0;
 
 	// early return
 	if (integer == 0) {
