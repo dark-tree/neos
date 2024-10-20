@@ -3,10 +3,22 @@
 REQUIRED_BINS := qemu-system-i386
 $(foreach bin,$(REQUIRED_BINS), $(if $(shell command -v $(bin) 2> /dev/null),$(true),$(error Please install `$(bin)`)))
 
+# Kernel assembly object files
+KERNEL_AS = \
+	build/kernel/kmalloc.o
+
+# Kernel C object files
+KERNEL_CC = \
+	build/kernel/entry.o \
+	build/kernel/console.o \
+	build/kernel/print.o \
+	build/kernel/memory.o \
+	build/kernel/math.o
+
 # Configuration
 CC_FLAGS = -nostdinc -fomit-frame-pointer -fno-builtin -nodefaultlibs -nostdlib -ffreestanding
 LD = ld -melf_i386 -nostdlib
-CC = gcc -m32 -fno-pie -std=gnu99 -Wall -Wextra $(CC_FLAGS) -O2
+CC = gcc -m32 -fno-pie -std=gnu99 -Wall -Wextra $(CC_FLAGS) -O2 -c
 AS = nasm -f elf32
 OC = objcopy -O binary
 
@@ -30,24 +42,17 @@ build/boot/start.bin: build src/boot/start.asm src/link/start.ld build/boot/load
 	$(LD) -T src/link/start.ld -o build/boot/start.elf build/boot/start.o
 	$(OC) build/boot/start.elf build/boot/start.bin
 
-build/kernel/kmalloc.o: build src/kernel/kmalloc.asm
-	$(AS) src/kernel/kmalloc.asm -o build/kernel/kmalloc.o
+# Describes the recipes for all kernel .c files
+$(KERNEL_CC): build/kernel/%.o: src/kernel/%.c build
+	$(CC) $< -o $@
 
-build/kernel/console.o: build src/kernel/console.c
-	$(CC) -c src/kernel/console.c -o build/kernel/console.o
-
-build/kernel/math.o: build src/kernel/math.c
-	$(CC) -c src/kernel/math.c -o build/kernel/math.o
-
-build/kernel/memory.o: build src/kernel/memory.c
-	$(CC) -c src/kernel/memory.c -o build/kernel/memory.o
-
-build/kernel/entry.o: build src/kernel/entry.c
-	$(CC) -c src/kernel/entry.c -o build/kernel/entry.o
+# Describes the recipes for all kernel .asm files
+$(KERNEL_AS): build/kernel/%.o: src/kernel/%.asm build
+	$(AS) $< -o $@
 
 # Compile the kernel to a flat binary
-build/kernel/kernel.bin: build src/link/kernel.ld build/kernel/entry.o build/kernel/kmalloc.o build/kernel/console.o build/kernel/memory.o build/kernel/math.o
-	$(LD) -T src/link/kernel.ld -o build/kernel/kernel.o
+build/kernel/kernel.bin: build src/link/kernel.ld $(KERNEL_AS) $(KERNEL_CC)
+	$(LD) -T src/link/kernel.ld -o build/kernel/kernel.o $(KERNEL_CC) $(KERNEL_AS)
 	$(OC) --only-section=.text --only-section=.data build/kernel/kernel.o build/kernel/kernel.bin
 
 # Create the floppy disc system image
