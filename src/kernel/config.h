@@ -13,6 +13,6 @@
 
 /**
  * @brief The spacing between tab-stops, that is,
- *        the equivalent in spaces of the tab character
+ *        the equivalent in spaces of the tab character.
  */
 #define CONSOLE_TAB_DISTANCE 4

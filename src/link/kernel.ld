@@ -5,15 +5,17 @@ INPUT(build/kernel/entry.o)
 INPUT(build/kernel/kmalloc.o)
 INPUT(build/kernel/console.o)
 INPUT(build/kernel/memory.o)
+INPUT(build/kernel/math.o)
 
 SECTIONS {
 	. = 0x8000;
 
-	/* Copy code and data for second stage */
+	/* First output all the functions */
 	.text : SUBALIGN(0) {
 		*(.text)
 	}
 
+	/* And then all the data */
 	.data : SUBALIGN(4) {
 		*(.rodata*)
 		*(.data)

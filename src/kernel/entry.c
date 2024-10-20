@@ -15,12 +15,6 @@ void start() {
 		con_write('3');
 	}
 
-//	con_write('B');
-//	con_write('y');
-//	con_write('e');
-//	con_write('?');
-//	con_write(ANSI_BACKSPACE);
-//	con_write('!');
 	con_write(ANSI_LINE_FEED);
 
 	con_write('1');
@@ -31,12 +25,11 @@ void start() {
 
 	con_write(ANSI_ESCAPE);
 	con_write(ANSI_CSI);
-	con_write('3');
+	con_write('9');
 	con_write('4');
 	con_write(';');
 	con_write('1');
-	con_write(';');
-	con_write('4');
+	con_write('0');
 	con_write('1');
 	con_write(ANSI_CSI_SGR);
 
@@ -93,15 +86,23 @@ void start() {
 
 	con_write(ANSI_ESCAPE);
 	con_write(ANSI_CSI);
-	con_write('1');
-	con_write('0');
+	con_write('9');
 	con_write(';');
 	con_write('1');
-	con_write('0');
 	con_write(ANSI_CSI_HVP);
 
 	con_write('X');
 
+
+	con_write(ANSI_ESCAPE);
+	con_write(ANSI_CSI);
+	con_write('0');
+	con_write(ANSI_CSI_EL);
+
+//	con_write(ANSI_ESCAPE);
+//	con_write(ANSI_CSI);
+//	con_write('2');
+//	con_write(ANSI_CSI_SD);
 
 	while (true) {
 		__asm("hlt");

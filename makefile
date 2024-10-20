@@ -36,6 +36,9 @@ build/kernel/kmalloc.o: build src/kernel/kmalloc.asm
 build/kernel/console.o: build src/kernel/console.c
 	$(CC) -c src/kernel/console.c -o build/kernel/console.o
 
+build/kernel/math.o: build src/kernel/math.c
+	$(CC) -c src/kernel/math.c -o build/kernel/math.o
+
 build/kernel/memory.o: build src/kernel/memory.c
 	$(CC) -c src/kernel/memory.c -o build/kernel/memory.o
 
@@ -43,7 +46,7 @@ build/kernel/entry.o: build src/kernel/entry.c
 	$(CC) -c src/kernel/entry.c -o build/kernel/entry.o
 
 # Compile the kernel to a flat binary
-build/kernel/kernel.bin: build src/link/kernel.ld build/kernel/entry.o build/kernel/kmalloc.o build/kernel/console.o build/kernel/memory.o
+build/kernel/kernel.bin: build src/link/kernel.ld build/kernel/entry.o build/kernel/kmalloc.o build/kernel/console.o build/kernel/memory.o build/kernel/math.o
 	$(LD) -T src/link/kernel.ld -o build/kernel/kernel.o
 	$(OC) --only-section=.text --only-section=.data build/kernel/kernel.o build/kernel/kernel.bin
 

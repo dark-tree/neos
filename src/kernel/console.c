@@ -2,12 +2,9 @@
 #include "memory.h"
 #include "ansi.h"
 #include "math.h"
+#include "config.h"
 
 /* private */
-
-#define CONSOLE_MAX_ANSI_SEQUENCE 64
-#define CONSOLE_DEFAULT_ATTRIBUTE 0b00000111
-#define CONSOLE_TAB_DISTANCE 4
 
 void (*output_lexer) (char);
 
@@ -15,6 +12,7 @@ static char sequence[CONSOLE_MAX_ANSI_SEQUENCE] = {0};
 static int length;
 
 // attribute background
+#define AB   0b11110000
 #define AB_I 0b10000000
 #define AB_R 0b01000000
 #define AB_G 0b00100000
@@ -22,6 +20,7 @@ static int length;
 #define AB_C 0b01110000
 
 // attribute foreground
+#define AF   0b00001111
 #define AF_I 0b00001000
 #define AF_R 0b00000100
 #define AF_G 0b00000010
@@ -48,6 +47,7 @@ static uint8_t con_attr() {
 	}
 
 	// inverted mode
+	// swap foreground and background attributes
 	uint8_t top = (0x0F & attribute) << 4;
 	return (top | (attribute >> 4)) & 0xFF;
 }
@@ -69,6 +69,7 @@ static int con_next_int(int* head, int last, int fallback) {
 	bool first = true;
 	int accumulator = 0;
 
+	// consume chars until a non-digit is hit
 	while (true) {
 		char next = con_next_char(head, last);
 
@@ -88,47 +89,69 @@ static int con_next_int(int* head, int last, int fallback) {
 }
 
 static void con_srg_apply(int code) {
+
+	// reset all text attributes
 	if (code == ANSI_SGR_RESET) {
 		attribute = CONSOLE_DEFAULT_ATTRIBUTE;
 		return;
 	}
 
+	// enable bold colors
 	if (code == ANSI_SGR_BOLD) {
 		attribute |= AF_I;
 		return;
 	}
 
+	// reset bold colors
 	if (code == ANSI_SGR_BOLD_RESET) {
 		attribute &= ~AF_I;
 		return;
 	}
 
+	// enable foreground-background attribute inversion
 	if (code == ANSI_SGR_INVERT) {
 		invert = true;
 		return;
 	}
 
+	// reset attribute inversion
 	if (code == ANSI_SGR_INVERT_RESET) {
 		invert = false;
 		return;
 	}
 
+	// enable foreground color
 	if (code >= ANSI_SGR_FG_COLOR_BEGIN && code <= ANSI_SGR_FG_COLOR_END) {
-		int color = ansi_to_rgb_bits(code - ANSI_SGR_FG_COLOR_BEGIN); // last 3 bits
+		int color = ansi_to_rgb_bits(code - ANSI_SGR_FG_COLOR_BEGIN);
 		attribute = (attribute & ~AF_C) | color;
 	}
 
-	if (code >= ANSI_SGR_BG_COLOR_BEGIN && code <= ANSI_SGR_BG_COLOR_END) {
-		int color = ansi_to_rgb_bits(code - ANSI_SGR_BG_COLOR_BEGIN); // last 3 bits
-		attribute = (attribute & ~AB_C) | (color << 4); // move into place
-	}
-
+	// reset foreground color
 	if (code == ANSI_SGR_FG_COLOR_RESET) {
 		attribute = (attribute & ~AF_C) | (CONSOLE_DEFAULT_ATTRIBUTE & AF_C);
 	}
 
+	// enable background color
+	if (code >= ANSI_SGR_BG_COLOR_BEGIN && code <= ANSI_SGR_BG_COLOR_END) {
+		int color = ansi_to_rgb_bits(code - ANSI_SGR_BG_COLOR_BEGIN);
+		attribute = (attribute & ~AB_C) | (color << 4); // move into place
+	}
+
+	// reset background color
 	if (code == ANSI_SGR_BG_COLOR_RESET) {
 		attribute = (attribute & ~AB_C);
+	}
+
+	// enable bold foreground color
+	if (code >= ANSI_SGR_FG_BOLD_BEGIN && code <= ANSI_SGR_FG_BOLD_END) {
+		int color = ansi_to_rgb_bits(code - ANSI_SGR_FG_BOLD_BEGIN);
+		attribute = (attribute & ~AF) | color | AF_I;
+	}
+
+	// enable bold background color
+	if (code >= ANSI_SGR_BG_BOLD_BEGIN && code <= ANSI_SGR_BG_BOLD_END) {
+		int color = ansi_to_rgb_bits(code - ANSI_SGR_BG_BOLD_BEGIN);
+		attribute = (attribute & ~AB) | (color << 4) | AB_I; // move into place
 	}
 
 }
@@ -211,37 +234,75 @@ static void con_csi_execute(int* head, int last) {
 		int m = con_next_int(head, last, 1) - 1;
 
 		x = clamp(n, 0, width - 1);
-		y = clamp(n, 0, height - 1);
+		y = clamp(m, 0, height - 1);
 		return;
 	}
+
+	// TODO there could be a bug in the erase functions
+	//      but i couldn't find exact specification how it should be erased,
+	//      currently it is erased like so: [start, end), both in line and display
 
 	// erase in display
 	if (code == ANSI_CSI_ED) {
 		int n = con_next_int(head, last, 0);
-		// TODO
+
+		switch (n) {
+			case ANSI_ERASE_AFTER:
+				con_erase(x, y, width - 1, height - 1);
+				break;
+
+			case ANSI_ERASE_BEFORE:
+				con_erase(0, 0, x, y);
+				break;
+
+			case ANSI_ERASE_WHOLE:
+			case ANSI_ERASE_RESET:
+				con_erase(0, 0, width - 1, height - 1);
+				break;
+
+			default:
+				break;
+		}
+
 		return;
 	}
 
 	// erase in line
 	if (code == ANSI_CSI_EL) {
 		int n = con_next_int(head, last, 0);
-		// TODO
+
+		switch (n) {
+			case ANSI_ERASE_AFTER:
+				con_erase(x, y, width - 1, y);
+				break;
+
+			case ANSI_ERASE_BEFORE:
+				con_erase(0, y, x, y);
+				break;
+
+			case ANSI_ERASE_WHOLE:
+			case ANSI_ERASE_RESET:
+				con_erase(0, y, width - 1, y);
+				break;
+
+			default:
+				break;
+		}
+
 		return;
 	}
 
 	// shift screen up
 	if (code == ANSI_CSI_SU) {
 		int n = con_next_int(head, last, 1);
-		// TODO
-		con_scroll(-n);
+		con_scroll(+n);
 		return;
 	}
 
 	// shift screen down
 	if (code == ANSI_CSI_SD) {
 		int n = con_next_int(head, last, 1);
-		// TODO
-		con_scroll(+n);
+		con_scroll(-n);
 		return;
 	}
 
@@ -422,29 +483,40 @@ void con_init(int max_width, int max_height) {
 }
 
 void con_scroll(int offset) {
+	int sign = sgn(offset);
+	int lines = min(abs(offset), height);
+	int last = height - 1;
+
 	long row = width * sizeof(uint16_t);
-	long last = height - 1;
+	long moves = height - lines;
+	long clears = height - moves;
 
-	if (offset == -1) {
-		memmove(con_at(0, 1), con_at(0, 0), last * row);
-		memset(con_at(0, 0), 0, row);
+	if (sign == -1) {
+		memmove(con_at(0, lines), con_at(0, 0), moves * row);
+		memset(con_at(0, 0), 0, clears * row);
 
-		y ++;
+		y += lines;
 		if (y > last) y = last;
 
 		return;
 	}
 
-	if (offset == 1) {
-		memmove(con_at(0, 0), con_at(0, 1), last * row);
-		memset(con_at(0, last), 0, row);
+	if (sign == +1) {
+		memmove(con_at(0, 0), con_at(0, lines), moves * row);
+		memset(con_at(0, moves), 0, clears * row);
 
-		y --;
+		y += lines;
 		if (y < 0) y = 0;
 
 		return;
 	}
+}
 
+void con_erase(int x1, int y1, int x2, int y2) {
+	void* start = con_at(x1, y1);
+	void* end = con_at(x2, y2);
+
+	memset(start, 0, end - start);
 }
 
 void con_write(char code) {

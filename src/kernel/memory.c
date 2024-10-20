@@ -1,7 +1,7 @@
 #include "memory.h"
 
 void* memcpy(void* dst, const void* src, long bytes) {
-	if (src == dst) {
+	if ((src == dst) || (bytes == 0)) {
 		return dst;
 	}
 
@@ -13,7 +13,7 @@ void* memcpy(void* dst, const void* src, long bytes) {
 }
 
 void* memmove(void* dst, const void* src, long bytes) {
-	if (src == dst) {
+	if ((src == dst) || (bytes == 0)) {
 		return dst;
 	}
 
@@ -34,4 +34,14 @@ void* memset(void* dst, uint8_t value, long bytes) {
 	}
 
 	return dst;
+}
+
+int strlen(const char* cstr) {
+	int length = 0;
+
+	while(cstr[length] != '\0') {
+		length ++;
+	}
+
+	return length;
 }
