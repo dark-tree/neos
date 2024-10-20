@@ -30,13 +30,17 @@ static int length;
 static bool invert;
 static uint8_t attribute;
 static int width, height;
-static int x, y, sx, sy;
+static int x, y;
 
-int next_tab_stop() {
+// saved state
+static uint8_t sa;
+static int sx, sy;
+
+static int con_next_tab_stop() {
     return (x / CONSOLE_TAB_DISTANCE) * CONSOLE_TAB_DISTANCE + ((x % CONSOLE_TAB_DISTANCE) ? CONSOLE_TAB_DISTANCE : 0);
 }
 
-static uint8_t ansi_to_rgb_bits(int index) {
+static uint8_t con_ansi_to_vga(int index) {
 	int color = index & 7;
 	return (color & 0b010) | ((color & 0b001) << 2) | ((color & 0b100) >> 2);
 }
@@ -122,7 +126,7 @@ static void con_srg_apply(int code) {
 
 	// enable foreground color
 	if (code >= ANSI_SGR_FG_COLOR_BEGIN && code <= ANSI_SGR_FG_COLOR_END) {
-		int color = ansi_to_rgb_bits(code - ANSI_SGR_FG_COLOR_BEGIN);
+		int color = con_ansi_to_vga(code - ANSI_SGR_FG_COLOR_BEGIN);
 		attribute = (attribute & ~AF_C) | color;
 	}
 
@@ -133,7 +137,7 @@ static void con_srg_apply(int code) {
 
 	// enable background color
 	if (code >= ANSI_SGR_BG_COLOR_BEGIN && code <= ANSI_SGR_BG_COLOR_END) {
-		int color = ansi_to_rgb_bits(code - ANSI_SGR_BG_COLOR_BEGIN);
+		int color = con_ansi_to_vga(code - ANSI_SGR_BG_COLOR_BEGIN);
 		attribute = (attribute & ~AB_C) | (color << 4); // move into place
 	}
 
@@ -144,13 +148,13 @@ static void con_srg_apply(int code) {
 
 	// enable bold foreground color
 	if (code >= ANSI_SGR_FG_BOLD_BEGIN && code <= ANSI_SGR_FG_BOLD_END) {
-		int color = ansi_to_rgb_bits(code - ANSI_SGR_FG_BOLD_BEGIN);
+		int color = con_ansi_to_vga(code - ANSI_SGR_FG_BOLD_BEGIN);
 		attribute = (attribute & ~AF) | color | AF_I;
 	}
 
 	// enable bold background color
 	if (code >= ANSI_SGR_BG_BOLD_BEGIN && code <= ANSI_SGR_BG_BOLD_END) {
-		int color = ansi_to_rgb_bits(code - ANSI_SGR_BG_BOLD_BEGIN);
+		int color = con_ansi_to_vga(code - ANSI_SGR_BG_BOLD_BEGIN);
 		attribute = (attribute & ~AB) | (color << 4) | AB_I; // move into place
 	}
 
@@ -314,7 +318,7 @@ static void con_csi_execute(int* head, int last) {
 	}
 
 	// restore cursor position
-	if (code == ANSI_CSI_SCP) {
+	if (code == ANSI_CSI_RCP) {
 		x = sx;
 		y = sy;
 		return;
@@ -391,7 +395,7 @@ static void con_lexer_initial(char code) {
 	}
 
 	if (code == ANSI_TAB) {
-		x = next_tab_stop();
+		x = con_next_tab_stop();
 		goto adjust;
 	}
 
@@ -428,6 +432,23 @@ static void con_lexer_escape(char code) {
 
 	if (code == ANSI_OSC || code == ANSI_SOS || code == ANSI_PM || code == ANSI_APC || code == ANSI_DCS) {
 		output_lexer = con_lexer_until_st;
+		return;
+	}
+
+	if (code == ANSI_DECSC) {
+		sx = x;
+		sy = y;
+		sa = attribute;
+		output_lexer = con_lexer_initial;
+		return;
+	}
+
+	// restore cursor position
+	if (code == ANSI_DECRC) {
+		x = sx;
+		y = sy;
+		attribute = sa;
+		output_lexer = con_lexer_initial;
 		return;
 	}
 
@@ -477,9 +498,11 @@ void con_init(int max_width, int max_height) {
 	attribute = CONSOLE_DEFAULT_ATTRIBUTE;
 	output_lexer = con_lexer_initial;
 	length = 0;
+	invert = false;
+
+	sa = attribute;
 	sx = 0;
 	sy = 0;
-	invert = false;
 }
 
 void con_scroll(int offset) {

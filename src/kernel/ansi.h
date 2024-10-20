@@ -49,18 +49,18 @@
 #define ANSI_SGR_INVERT_RESET      27  /* Un-swaps background and foreground colors */
 #define ANSI_SGR_FG_COLOR_BEGIN    30  /* First foreground color code */
 #define ANSI_SGR_FG_COLOR_END      37  /* Last foreground color code */
-//#define ANSI_SGR_FG_COLOR_EXTENDED 38  /* Marks the start of extended foreground color code */
+#define ANSI_SGR_FG_COLOR_EXTENDED 38  /* TODO Marks the start of extended foreground color code */
 #define ANSI_SGR_FG_COLOR_RESET    39  /* Reset foreground color to the default value */
 #define ANSI_SGR_FG_BOLD_BEGIN     90  /* Marks the start of intensified foreground color code */
 #define ANSI_SGR_FG_BOLD_END       97  /* Last intensified foreground color code */
 #define ANSI_SGR_BG_COLOR_BEGIN    40  /* First background color code */
 #define ANSI_SGR_BG_COLOR_END      47  /* Last background color code */
-//#define ANSI_SGR_BG_COLOR_EXTENDED 48  /* Marks the start of extended background color code */
+#define ANSI_SGR_BG_COLOR_EXTENDED 48  /* TODO Marks the start of extended background color code */
 #define ANSI_SGR_BG_COLOR_RESET    49  /* Reset background color to the default value */
 #define ANSI_SGR_BG_BOLD_BEGIN     100 /* Marks the start of intensified background color code */
 #define ANSI_SGR_BG_BOLD_END       107 /* Last intensified background color code */
-//#define ANSI_SGR_COLOR_PALLET      2   /* follows the *_EXTENDED colors, marks the start of pallet color */
-//#define ANSI_SGR_COLOR_RGB         5   /* follows the *_EXTENDED colors, marks the start of RGB color */
+#define ANSI_SGR_COLOR_PALLET      2   /* follows the *_EXTENDED colors, marks the start of pallet color */
+#define ANSI_SGR_COLOR_RGB         5   /* follows the *_EXTENDED colors, marks the start of RGB color */
 
 // Erase modes (ANSI_CSI_ED, ANSI_CSI_EL)
 #define ANSI_ERASE_AFTER  0 /* Clear from cursor to the end of object */
