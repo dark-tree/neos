@@ -1,22 +1,16 @@
 
 #include "types.h"
-
-
-volatile bool truth = true;
+#include "console.h"
+#include "print.h"
 
 extern char test();
 
 void start() {
-	uint16_t volatile* screen = (uint16_t*) 0xB8000;
+	con_init(80, 25);
 
-	while (truth) {
-		for (int i = 0; i < 320 * 200; i ++) {
-			volatile uint8_t* chr = &screen[i];
+	kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m0x%x\e[m again!", "sweet", 'r', 1920);
 
-			__asm ("nop");
-
-			chr[0] = test();
-			chr[1] = 0b01001001;
-		}
+	while (true) {
+		__asm("hlt");
 	}
 }
