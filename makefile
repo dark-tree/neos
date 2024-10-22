@@ -64,12 +64,12 @@ clean:
 
 # Invoke QEMU wihtout waiting for GDB
 run: build/final.iso
-	qemu-system-i386 -monitor stdio -cdrom ./build/final.iso -boot a
+	qemu-system-i386 -singlestep -monitor stdio -cdrom ./build/final.iso -boot a
 
 # Invoke QEMU and wait for GDB
 debug: build/final.iso
-	qemu-system-i386 -cdrom ./build/final.iso -boot a -s -S &
-	gdb -ex 'target remote localhost:1234' -ex 'break *0x7c00' -ex 'c'
+	qemu-system-i386 -singlestep -cdrom ./build/final.iso -boot a -s -S &
+	gdb -ex 'target remote localhost:1234' -ex 'break *0x8000' -ex 'c'
 
 disasm: build/bootloader.bin
 	ndisasm -b 16 -o 7c00h ./build/bootloader.bin
