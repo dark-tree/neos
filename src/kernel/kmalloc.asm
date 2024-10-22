@@ -9,7 +9,8 @@ section .text
 
 global test
 global kset
-
+global testtreesize
+global testtreepointer
 
 ;Function takes 2 arguments: (uint32_t tree level, uint32_t node number)
 ;Returns an uint32_t, with the contains bits of that node (N youngest bits, where N-1 == level) 
@@ -20,21 +21,20 @@ push EBX
 push ESI
 push EDI
 	mov ESI, [EBP+8]
-	add ESI,  tree_levels	;All levels are tables, ESI register will contain a pointer to the one we need 
+	mov EBX, tree_levels
+	add ESI,  [EBX+8*ESI+4]	;All levels are tables, ESI register will contain a pointer to the one we need 
 
-	mov EBX, [EBP+8]
-	add EBX, 1	;All elements of level 0 are 1-bit, elements of level 1 are 2-bit etc. Hence we're adding 1
-
+	mov EBX, 8
 	mov EDX, 0
 	mov EAX, [EBP+12]
-	div EBX			;Calculating which bit in which byte of the array our bits start at
+	div EBX			;Calculating from  which bit in which byte of the array our bits start at, dividing bit number by byte size
 
 	mov EAX, [ESI+EAX]
 	mov ECX, EDX
 	shl EAX, CL	;Bits we needed were somewhere in the middle of the EAX register, now those are the oldes bits
 
 	mov EBX, 32
-	mov EBX, EDX	;Calculating how much we need to shift right, for our bits to be N youngest bits of that array
+	sub EBX, EDX	;Calculating how much we need to shift right, for our bits to be N youngest bits of that array
 
 	mov ECX, EBX
 	shr EAX, CL
@@ -49,30 +49,34 @@ ret
 ;Note: only tree_level+1 youngest bits from the new_value will be used 
 kinternal_settreeelement:
 push EBP
-mov EBP, ESP
+mov EAX, ESP
 push EBX
 push ESI
 push EDI
-	mov ESI, [EBP+8]
-	add ESI,  tree_levels	;All levels are tables, ESI register will contain a pointer to the one we need 
+	mov ESI, [EAX+8]
+	mov EBX, tree_levels
+	mov ESI, [EBX+8*ESI+4]	;All levels are tables, ESI register will contain a pointer to the one we need 
 
-	mov EBX, [EBP+8]
-	add EBX, 1	;All elements of level 0 are 1-bit, elements of level 1 are 2-bit etc. Hence we're adding 1
-
+	mov EBX, 8
 	mov EDX, 0
-	mov EAX, [EBP+12]
-	div EBX			;Calculating which bit in which byte of the array our bits start at
+	mov EBP, [EAX+12]
+	push EAX
+	mov EAX, EBP
+	div EBX
+	mov EBP, EAX
+	pop EAX		;Calculating from which bit in which byte of the array our bits start at, by diding bit number by byte size.
 
-	mov EDI, [ESI+EAX]
+	mov EDI, [ESI+EBP]
 
 
-	mov EBX, [EBP+16]
-	shl EBX, 32
-	mov ECX, EDX
-	shr EBX, CL
-	mov [EBP+16], EBX	;Putting input bits at the right position in the entire dword to create a proper bitmask
+	mov EBX, [EAX+16]
+	
+	mov ECX, 32
+	sub ECX, EDX
+	shl EBX, CL
+	mov [EAX+16], EBX	;Putting input bits at the right position in the entire dword to create a proper bitmask
 
-	mov EBX, [EBP+12]
+	mov EBX, [EAX+12]
 	add EBX, EDX
 
 	ste_ptl1:	;Setting corresponding bits to 0, so that we can easily set them to proper values using OR
@@ -81,8 +85,8 @@ push EDI
 	cmp EDX, EBX
 	jb ste_ptl1
 
-	OR EDI, [EBP+16]
-	mov [ESI+EAX], EDI
+	OR EDI, [EAX+16]
+	mov [ESI+EBP], EDI
 
 pop EDI
 pop ESI
@@ -91,28 +95,32 @@ pop EBP
 ret
 
 
-test2:
-	push EBP
-	mov EBP, ESP
-	push EBX
-	push ESI
-	push EDI
-	mov EAX, 'J'
-	pop EDI
-	pop ESI
-	pop EBX
-	pop EBP
+
+
+testtreesize:
+	mov EAX, [ESP+4]
+	mov EAX, [tree_levels+8*EAX]
 	ret
+
+
+
+testtreepointer:
+	mov EAX, [ESP+4]
+	mov EDX, tree_levels
+	mov EAX, [EDX+8*EAX+4]
+	ret
+
 
 
 
 kinternal_initializetree:
 push EBP
-mov EBP, ESP
 push EBX
 push ESI
 push EDI
+
 	mov EAX, [end]
+	add EAX, [offset]
 	mov [tree_levels+4], EAX
 
 	;First, we need to calculate how many leaves the tree will have - this will be a power of 2, larger or equal than number of blocks
@@ -126,6 +134,8 @@ push EDI
 
 	;We initialize last X nodes in the lowest tree level with 1s (that's because those represent non-existent blocks, so we mark them as allocated from the start)
 	mov EAX, [block_number]
+	cmp EAX, ECX
+	jae skip_it_ptl2
 	it_ptl2:
 		push EAX
 		push EDX
@@ -141,11 +151,14 @@ push EDI
 	add EAX, 1
 	cmp EAX, ECX
 	jb it_ptl2
-	
-	shr EDX, 3 	;On level 0 each node has 1 bit, so we divide by 8 to get total array size
 
+	skip_it_ptl2:
+	
+	mov EDI, [tree_levels]	;Size of the array represening level 0
+	shr EDI, 3 	;On level 0 each node has 1 bit, so we divide by 8 to get total array size
 	mov EAX, [end]
 	add EDI, EAX	;From this byte we start allocating next levels, starting from 1
+	add EDI, [offset]
 
 	;Now we are allocating memory for all tree levels:
 	mov ECX, [tree_levels]	
@@ -154,14 +167,14 @@ push EDI
 	mov EBX, 2	;Bits per node on this level
 	it_ptl3:
 		;First we set the descriptor for the current level
-		push ECX
-		mov ECX, tree_levels
+		
+		mov EBP, tree_levels
 		push EAX
 		shl EAX, 3	;Descriptor of each tree level takes up 8 bytes
-		mov [EAX + ECX], ECX
-		mov [EAX + ECX + 4], EDI
+		mov [EAX + EBP], ECX
+		mov [EAX + EBP + 4], EDI
 		pop EAX
-		pop ECX
+		
 
 		;Then we calculate the values for next level
 		add EAX, 1
@@ -172,7 +185,8 @@ push EDI
 		push EAX
 		mov EDX, 0
 		mov EAX, ECX
-		div EBX
+		mul EBX
+		shr EAX, 3
 		add EAX, 1
 		add EDI,EAX
 		pop EAX
@@ -218,9 +232,10 @@ push EBX
 	mov [end], EBX		;At the end of the managed domain there will be information about reserved blocks stored, this number represents where it starts.
 	mov EAX, [EBP+12]
 	mov [offset], EAX	;Save area offset
-	mov EAX, 'H'
+	
+
 	;Initializing the tree (this function is taking parameters from this global variables)
-	call test2
+	call kinternal_initializetree
 pop EBX
 pop EBP
 ret

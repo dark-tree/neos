@@ -4,17 +4,22 @@
 #include "print.h"
 
 extern uint32_t test();
-extern uint32_t kset(uint32_t base, uint32_t offset);
+extern void kset(uint32_t base, uint32_t offset);
+extern uint32_t testtreesize(uint32_t level);
+extern uint32_t testtreepointer(uint32_t level);
 
 void start() {
 
-	uint16_t volatile* screen = (uint16_t*) 0xB8000;
-	kset(270*16, 1024*1024);
-	
+	kset(264*16-5, 1024*1024);
+
 	con_init(80, 25);
-
-	kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m0x%x\e[m again!", "sweet", 'r', 1920);
-
+	kprintf("\e[2J");
+	for(int i=0;i<32;i++)
+	{
+		kprintf("%d %d,  ", testtreesize(i), testtreepointer(i));
+	}
+	kprintf("\n\n");
+	kprintf("%d %d", *((uint8_t*)testtreepointer(0)), *((uint8_t*)(testtreepointer(0)+1)));
 	while (true) {
 		__asm("hlt");
 
