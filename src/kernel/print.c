@@ -22,7 +22,6 @@ void kprint_integer(long integer, int base) {
 
 	char buffer[KPRINTF_MAX_DIGITS] = {0};
 	int i = KPRINTF_MAX_DIGITS - 2;
-	//buffer[i] = 0;
 
 	// early return
 	if (integer == 0) {

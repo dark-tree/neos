@@ -1,4 +1,6 @@
-## NEOS
+
+
+<img src="./logo-neos.png" title="" alt="logo-neos.png" data-align="center">
 
 ```bash
 # First install QEMU
