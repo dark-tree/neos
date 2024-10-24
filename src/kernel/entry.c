@@ -7,6 +7,8 @@ extern uint32_t test();
 extern void kset(uint32_t base, uint32_t offset);
 extern uint32_t testtreesize(uint32_t level);
 extern uint32_t testtreepointer(uint32_t level);
+extern uint32_t kinternal_gettreeelement(uint32_t tree_level, uint32_t node_number);
+extern void kinternal_settreeelement(uint32_t tree_level, uint32_t node_number, uint32_t value);
 
 void start() {
 
@@ -19,7 +21,18 @@ void start() {
 		kprintf("%d %d,  ", testtreesize(i), testtreepointer(i));
 	}
 	kprintf("\n\n");
+
+	kinternal_settreeelement(1, 5, 0b11);
+	kprintf("%d", kinternal_gettreeelement(1, 5)); 
+	kprintf("\n\n");
 	kprintf("%d %d", *((uint8_t*)testtreepointer(0)), *((uint8_t*)(testtreepointer(0)+1)));
+	kprintf("\n%d %d", *((uint8_t*)testtreepointer(1)), *((uint8_t*)(testtreepointer(1)+1)));
+	kprintf("\n%d %d", *((uint8_t*)testtreepointer(2)), *((uint8_t*)(testtreepointer(2)+1)));
+	kprintf("\n%d", *((uint8_t*)testtreepointer(3)));
+	kprintf("\n%d %d", *((uint8_t*)testtreepointer(4)));
+
+
+
 	while (true) {
 		__asm("hlt");
 
