@@ -13,6 +13,77 @@ global testtreesize
 global testtreepointer
 global kinternal_gettreeelement
 global kinternal_settreeelement
+global kinternal_buddify
+
+;This function updates the node, so that it contains accurate information about block availibility. It does so, based on it's immediate children, so this function needs to be called on the entire tree branch at once, bottom to the top. 
+;Takes 2 arguments: (uint32_t tree_level, uint32_t node_number), returns nothing
+kinternal_buddify:
+mov ECX, ESP
+push EBP
+push EBX
+push ESI
+push EDI
+	mov EBP, [ECX+4]
+	sub EBP, 1	;EBP contains level, where the dildren of this node are located
+	mov EBX, [ECX+8]
+	shl EBX, 1	;EBX containes index of the left child
+	
+	push ECX
+	push EDX
+	push EBX
+	push EBP
+	call kinternal_gettreeelement	;Moving value of the left child into EAX
+	add ESP, 8
+	pop EDX
+	pop ECX
+
+	mov EDX, EAX	;Moving value of the left child into EDX
+
+	add EBX, 1	;Index of the right child
+
+	push ECX
+	push EDX
+	push EBX
+	push EBP
+	call kinternal_gettreeelement	;Moving value of the right child into EAX
+	add ESP, 8
+	pop EDX
+	pop ECX
+
+	mov EBX, EAX
+	and EBX, EDX	;and-ing values of both children - all bits of this node are determined this way, except for the oldest one (because if this node denotes 8-segment area, then allocating 4 segments is possible if either child has the space, but allocating 8 segments is only possible if both children are empty)
+
+	mov ESI, [ECX+4]
+	sub ESI, 1	;ESI contains the number of bits of each child minus 1 - so the number of bits we have to shift, so that olders bit of either child is on bit 0 in EAX and EDX registers
+	mov EDI, ECX
+	mov ECX, ESI
+	shr EAX, CL
+	shr EDX, CL
+	or EAX, EDX	;If result of this is 0 - the the largest possible area (for example 8 segments in level-3 node can be allocated, because it means that both 4-segment level-2 nodes are free)
+	shl EAX, CL
+	shl EAX, 1	;Returning this bit to the appropriate spot (oldest bit of this node)
+	
+
+	or EBX, EAX	;Now EBX contains value this node should have
+
+	mov EBP, [EDI+4]
+	mov EAX, [EDI+8]
+
+	push EBX
+	push EAX
+	push EBP
+	call kinternal_settreeelement	;So we are saving this value into the tree
+	add ESP, 12
+
+pop EDI
+pop ESI
+pop EBX
+pop EBP
+ret
+
+
+
+
 
 ;Function takes 2 arguments: (uint32_t tree level, uint32_t node number)
 ;Returns an uint32_t, with the contains bits of that node (N youngest bits, where N-1 == level) 
@@ -99,7 +170,7 @@ push EDI
 	mov EBP, EAX
 	pop EAX		;Calculating from which bit in which byte of the array our bits start at, by diding bit number by byte size.
 
-	mov EDI, [ESI+EBP]
+	mov EDI, [ESI+EBP]	;This whole block of code does a byte endian swap
 	push EAX
 	push EBX
 	mov EAX, EDI
@@ -119,10 +190,11 @@ push EDI
 
 	mov EBX, [EAX+16]
 	mov ECX, 32
-	sub ECX, EDX
 	sub ECX, [EAX+8]
 	sub ECX, 1
-	shl EBX, CL
+	shl EBX, CL	;Now our bitd are the X oldest bits in the double word (whis is basically input sanitization - if you try to input 6 bits into a 5-bit tree node, the olderst bit will be nullified)
+	mov ECX, EDX
+	shr EBX, CL
 	mov [EAX+16], EBX	;Putting input bits at the right position in the entire dword to create a proper bitmask
 
 	mov EBX, [EAX+12]
@@ -136,7 +208,7 @@ push EDI
 
 	OR EDI, [EAX+16]
 
-	mov EAX, EDI
+	mov EAX, EDI	;Another byte endian swap
 	movzx EBX, AL
 	shr EAX, 8
 	shl EBX, 8
