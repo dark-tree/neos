@@ -266,17 +266,16 @@ push EDI
 	mov [tree_levels], ECX	;We save the number of nodes, that the first tree level will have
 
 
-	;Initialiing the entire tree level 0 with 0s (marking them as unallocated), higher tree levels will be initialized recursively based on the first one.
-	mov EDI, [tree_levels+4]
-	mov EAX, 0
+	;Initialiing the entire tree with 0s (marking them as unallocated)
+	mov EDI, [tree_levels+4]	;Table storing level 0 is the first, so it's pointer is also a pointer to the whole tree
 	push EDX
-	mov EDX, ECX
-	shr EDX, 3
+	mov EDX, [size]
+	add EDX, [offset]	;Calculating where control structure ends (at the end of the entire managed heap)
 
 	it_ptl4:
-		mov BYTE [EAX+EDI], 0
-	add EAX, 1
-	cmp EAX, EDX
+		mov BYTE [EDI], 0
+	add EDI, 1
+	cmp EDI, EDX
 	jb it_ptl4
 	
 	pop EDX
