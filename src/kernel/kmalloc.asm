@@ -353,22 +353,23 @@ push EDI
 		mov [8*EAX + EBP + 4], EDI	;Setting pointer to this tree level
 		mov [max_tree_level], EAX	;Updating the information on what the current highest level is
 		
+		push EDX
+		push EAX
+		mov EDX, 0
+		mov EAX, ECX
+		mul EBX		;Bits per node multiplied by level size - how many bits does the current level take up
+		sub EAX, 1
+		shr EAX, 3	;How many bytes does the current level take up (dividing number of bits by 8, but first subtracting 1 and then adding 1, in order to round up the number)
+		add EAX, 1	
+		add EDI,EAX	;Calculating pointer to the next level, by taking pointer to the pravious level and adding it's size. 
+		pop EAX
+		pop EDX
 
 		;Then we calculate the values for next level
 		add EAX, 1	;New tree level
 		add EBX, 1	;On new level each node will have 1 bit more, than on previous one
 		shr ECX, 1	;Binary tree - each new level is half the size of the previous one
 
-		push EDX
-		push EAX
-		mov EDX, 0
-		mov EAX, ECX
-		mul EBX		;Bits per node multiplied by level size - how many bits does will the new level take up
-		shr EAX, 3	;How many bytes will the new level take up
-		add EAX, 1	
-		add EDI,EAX
-		pop EAX
-		pop EDX
 	push EAX
 	mov EAX, 0
 	cmp EAX, ECX	;We stop when size of the next level would be 0
