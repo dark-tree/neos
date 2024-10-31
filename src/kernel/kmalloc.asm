@@ -15,6 +15,35 @@ global kinternal_gettreeelement
 global kinternal_settreeelement
 global kinternal_buddify
 
+
+
+
+
+
+
+;This function executes ,,buddify" on the given node and all its ancestors (parents, grandparents etc)
+;Takes 2 arguments: (uint32_t tree_level, uint32_t node_number), returns nothing
+kinternal_full_buddify:
+mov EDX, ESP
+push EBP
+push EBX
+push ESI
+push EDI
+
+
+
+
+pop EDI
+pop ESI
+pop EBX
+pop EBP
+ret
+
+
+
+
+
+
 ;This function updates the node, so that it contains accurate information about block availibility. It does so, based on it's immediate children, so this function needs to be called on the entire tree branch at once, bottom to the top. 
 ;Takes 2 arguments: (uint32_t tree_level, uint32_t node_number), returns nothing
 kinternal_buddify:
@@ -319,31 +348,30 @@ push EDI
 		;First we set the descriptor for the current level
 		
 		mov EBP, tree_levels
-		push EAX
-		shl EAX, 3	;Descriptor of each tree level takes up 8 bytes
-		mov [EAX + EBP], ECX
-		mov [EAX + EBP + 4], EDI
-		pop EAX
+		;Descriptor of each tree level takes up 8 bytes
+		mov [8*EAX + EBP], ECX	;Setting size of this tree level
+		mov [8*EAX + EBP + 4], EDI	;Setting pointer to this tree level
+		mov [max_tree_level], EAX	;Updating the information on what the current highest level is
 		
 
 		;Then we calculate the values for next level
-		add EAX, 1
-		add EBX, 1
-		shr ECX, 1
+		add EAX, 1	;New tree level
+		add EBX, 1	;On new level each node will have 1 bit more, than on previous one
+		shr ECX, 1	;Binary tree - each new level is half the size of the previous one
 
 		push EDX
 		push EAX
 		mov EDX, 0
 		mov EAX, ECX
-		mul EBX
-		shr EAX, 3
-		add EAX, 1
+		mul EBX		;Bits per node multiplied by level size - how many bits does will the new level take up
+		shr EAX, 3	;How many bytes will the new level take up
+		add EAX, 1	
 		add EDI,EAX
 		pop EAX
 		pop EDX
 	push EAX
 	mov EAX, 0
-	cmp EAX, ECX
+	cmp EAX, ECX	;We stop when size of the next level would be 0
 	pop EAX
 	jne it_ptl3
 	
@@ -412,6 +440,7 @@ ret
 
 section .data
 
+max_tree_level: dd 0
 end: dd 0
 size: dd 0
 offset: dd 0
