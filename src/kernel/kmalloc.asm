@@ -30,8 +30,32 @@ push EBX
 push ESI
 push EDI
 
+mov EAX, [max_tree_level] ;Highest tree level
+mov EBX, [EDX+4]	;Current tree level
+mov ECX, [EDX+8]	;Current node number
+
+;Loop calling buddify on all nodes above the selected one (notice, that we do not call buddify on thje given node, only it's ancestors - we do that because those function will be usiually code directly after updating the given node)..
+fb_ptl1:
+	add EBX, 1	;Moving 1 level up
+	shr ECX, 1	;Parent of the current node
 
 
+	push EAX
+	push EDX
+	push ECX
+	;Arguments
+	push ECX	;Node number
+	push EBX	;Tree level
+	call kinternal_buddify
+	add ESP, 8
+
+	pop ECX
+	pop EDX
+	pop EAX
+	
+
+cmp EBX, EAX
+jb fb_ptl1
 
 pop EDI
 pop ESI
@@ -308,31 +332,10 @@ push EDI
 	jb it_ptl4
 	
 	pop EDX
-
-
-
-	;We initialize last X nodes in the lowest tree level with 1s (that's because those represent non-existent blocks, so we mark them as allocated from the start)
-	mov EAX, [block_number]
-	cmp EAX, ECX
-	jae skip_it_ptl2
-	it_ptl2:
-		push EAX
-		push EDX
-		push ECX
-		push DWORD 1	;Setting node to 1
-		push EAX	;Node number EAX
-		push DWORD 0	;On tree level 0
-		call kinternal_settreeelement
-		add ESP, 12
-		pop ECX
-		pop EDX
-		pop EAX
-	add EAX, 1
-	cmp EAX, ECX
-	jb it_ptl2
-
-	skip_it_ptl2:
 	
+	
+	push ECX
+
 	mov EDI, [tree_levels]	;Size of the array represening level 0
 	shr EDI, 3 	;On level 0 each node has 1 bit, so we divide by 8 to get total array size
 	mov EAX, [end]
@@ -375,7 +378,48 @@ push EDI
 	cmp EAX, ECX	;We stop when size of the next level would be 0
 	pop EAX
 	jne it_ptl3
+
+
+	pop ECX
 	
+	;We initialize last X nodes in the lowest tree level with 1s (that's because those represent non-existent blocks, so we mark them as allocated from the start)
+	mov EAX, [block_number]
+	cmp EAX, ECX
+	jae skip_it_ptl2
+	it_ptl2:
+		push EAX
+		push EDX
+		push ECX
+
+		push DWORD 1	;Setting node to 1
+		push EAX	;Node number EAX
+		push DWORD 0	;On tree level 0
+		call kinternal_settreeelement
+		add ESP, 12
+
+		pop ECX
+		pop EDX
+		pop EAX
+
+
+		push EAX
+		push EDX
+		push ECX
+
+		push EAX	;Calling full buddify on the node we just set to 1
+		push DWORD 0	;...on level 0
+		call kinternal_full_buddify
+		add ESP, 8
+
+		pop ECX
+		pop EDX
+		pop EAX
+
+	add EAX, 1
+	cmp EAX, ECX
+	jb it_ptl2
+
+	skip_it_ptl2:
 
 
 pop EDI

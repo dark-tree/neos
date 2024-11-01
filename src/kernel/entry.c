@@ -22,10 +22,12 @@ void start() {
 	}
 	kprintf("\n\n");
 
-	kinternal_settreeelement(2, 0, 0b000);
-	kinternal_settreeelement(2, 1, 0b111);
-	kinternal_buddify(3, 0);
-	kprintf("%d", kinternal_gettreeelement(1, 5)); 
+	//kinternal_settreeelement(2, 0, 0b000);
+	//kinternal_settreeelement(2, 1, 0b111);
+	//kinternal_settreeelement(1, 7, 0b00);
+	//kinternal_settreeelement(1, 7, 0b11);
+	//kinternal_buddify(1, 7);
+	kprintf("%d", kinternal_gettreeelement(1, 7)); 
 	kprintf("\n\n");
 	kprintf("%d %d", *((uint8_t*)testtreepointer(0)), *((uint8_t*)(testtreepointer(0)+1)));
 	kprintf("\n%d %d", *((uint8_t*)testtreepointer(1)), *((uint8_t*)(testtreepointer(1)+1)));
