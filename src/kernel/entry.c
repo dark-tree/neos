@@ -11,6 +11,7 @@ extern uint32_t kinternal_gettreeelement(uint32_t tree_level, uint32_t node_numb
 extern void kinternal_settreeelement(uint32_t tree_level, uint32_t node_number, uint32_t value);
 extern void kinternal_buddify(uint32_t tree_level, uint32_t node_number);
 extern uint32_t  kinternal_allocate(uint32_t tree_level, uint32_t node_number, uint32_t segment_number_bitmask, uint32_t power_of_2);
+extern void* kmalloc(uint32_t size);
 
 void start() {
 
@@ -29,6 +30,23 @@ void start() {
 	//kinternal_settreeelement(1, 7, 0b00);
 	//kinternal_settreeelement(1, 7, 0b11);
 	//kinternal_buddify(1, 7);
+
+
+	//kinternal_settreeelement(2, 3, 0b111);
+	//kinternal_settreeelement(2, 2, 0b111);
+
+	//kinternal_settreeelement(3, 1, 0b1111);
+	//kinternal_settreeelement(3, 0, 0b1111);
+	//kinternal_settreeelement(2, 1, 0b101);
+	
+	kmalloc(200);
+	kmalloc(200);
+	kmalloc(400);
+	kmalloc(400);
+	kmalloc(800);
+	kmalloc(200);
+	kmalloc(400);
+	
 	kprintf("%d\n", kinternal_allocate(4, 0,  0b100, 2));
 	kprintf("%d\n", kinternal_gettreeelement(1, 7)); 
 	kprintf("\n\n");

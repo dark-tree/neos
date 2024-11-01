@@ -9,6 +9,8 @@ section .text
 
 global test
 global kset
+global kmalloc
+
 global testtreesize
 global testtreepointer
 global kinternal_gettreeelement
@@ -41,14 +43,84 @@ push EDI
 	skip_m_ptl1:
 	cmp EDX, EAX
 	jb m_ptl1	;If EDX is less than EAX, jumping back
-	
+
 	;Now EDX stores the number of blocks we will actually allocate. ECX stores information on which power of 2 it is (we will need that information, because we need to know on which tree level in the control structure we need to look
 
 	mov EBX, 1
 	shl EBX, CL	;We are creating a bitmask that we will apply to tree nodes to check, whether allocating a block of consisting of 2^ECX == EDX number of segments is possible in that node.
 
+	mov ESI, [max_tree_level]
 
+	push EDX
+	push ECX
 
+	push DWORD 0
+	push ESI
+	call kinternal_gettreeelement ;Reading the top tree node to check whether allocation is possible
+	add ESP, 8
+
+	pop ECX
+	pop EDX
+
+	;Checking if allocating an area of this size is possible
+	and EAX, EBX
+	mov EDI, 0
+	cmp EDI, EAX
+	mov EAX, 0
+	jne m_return	;...if not, we're returning 0 (null)
+
+	push ECX
+	push EDX
+
+	push ECX
+	push EBX
+	push DWORD 0
+	push ESI
+	call kinternal_allocate	;Searching for a free tree node on tree level ECX
+	add ESP, 16
+
+	pop EDX
+	pop ECX
+
+	;Now EAX stores the number of node that we're allocating, on level number stored by ECX
+
+	;Marking the area as allocated:
+	push ECX
+	push EDX
+	push EAX
+	
+	push DWORD 0xFFFFFFFF
+	push EAX
+	push ECX
+	call kinternal_settreeelement
+	add ESP, 12
+	
+	pop EAX
+	pop EDX
+	pop ECX
+
+	;Updating the tree upwards with a full buddify:
+	push EAX
+	push ECX
+	push EDX
+
+	push EAX
+	push ECX
+	call kinternal_full_buddify
+	add ESP, 8
+	
+	pop EDX
+	pop ECX
+	pop EAX
+
+	shl EAX, CL	;We need to get the first descentant of node EAX on level ECX, that is on level 0, because that represents the first segment of the allocated memory area
+
+	mov EDX, 0
+	mov EBX, KMALLOC_BLOCK_SIZE
+	mul EBX
+	
+
+	m_return:
 pop EDI
 pop ESI
 pop EBX
@@ -76,7 +148,7 @@ push EDI
 	
 	
 	sub ECX, 1	;We will be checking children, so we move 1 level down
-	shr EBX, 1	;We're checking left child first
+	shl EBX, 1	;We're checking left child first
 
 	push ECX
 	push EDX
@@ -359,11 +431,14 @@ push EDI
 	shr EBX, CL
 	mov [EAX+16], EBX	;Putting input bits at the right position in the entire dword to create a proper bitmask
 
-	mov EBX, [EAX+12]
+	mov EBX, [EAX+8]
+	add EBX, 1
 	add EBX, EDX
 
 	ste_ptl1:	;Setting corresponding bits to 0, so that we can easily set them to proper values using OR
-		btr EDI, EDX
+		mov ECX, 31
+		sub ECX, EDX
+		btr EDI, ECX
 	add EDX, 1
 	cmp EDX, EBX
 	jb ste_ptl1
