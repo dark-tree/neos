@@ -14,8 +14,117 @@ global testtreepointer
 global kinternal_gettreeelement
 global kinternal_settreeelement
 global kinternal_buddify
+global kinternal_allocate
+
+;This function allocates a memory area of a given size
+;Takes 1 argument: (uint32_t size)
+kmalloc:
+mov EDX, ESP
+push EBP
+push EBX
+push ESI
+push EDI
+	mov EAX, [EDX+4]
+	sub EAX, 1
+	mov EDX, 0
+	mov EBX, KMALLOC_BLOCK_SIZE
+	div EBX
+	add EAX, 1	;Now EAX stores the number of blocks that will need to be allocated
+
+	;Due to how the allocator works, block number needs to be a power of 2, so we need to get a power of 2 greater or equal to EAX
+	mov EDX, 1
+	mov ECX, 0	;This number will inform us which power of 2 EDX is
+	jmp skip_m_ptl1	;We want to check the condition before multiplying EDX by two, just in case EAX is equal to 1
+	m_ptl1:
+		shl EDX, 1	;Multiplying by 2
+		add ECX, 1
+	skip_m_ptl1:
+	cmp EDX, EAX
+	jb m_ptl1	;If EDX is less than EAX, jumping back
+	
+	;Now EDX stores the number of blocks we will actually allocate. ECX stores information on which power of 2 it is (we will need that information, because we need to know on which tree level in the control structure we need to look
+
+	mov EBX, 1
+	shl EBX, CL	;We are creating a bitmask that we will apply to tree nodes to check, whether allocating a block of consisting of 2^ECX == EDX number of segments is possible in that node.
 
 
+
+pop EDI
+pop ESI
+pop EBX
+pop EBP
+ret
+
+
+;This fuction finds an empty spot in the control structure, starting from the given node and returns its segment number. It assumes that the area can be allocated in that node (you need to check for that before calling this fuction)
+;Takes 4 arguments: (uint32_t tree_level, uint32_t node_number, uint32_t segment_number_bitmask, uint32_t which_power_of_two)
+kinternal_allocate:
+mov EDX, ESP
+push EBP
+push EBX
+push ESI
+push EDI
+	mov ECX, [EDX+4] ;Tree level
+	mov EBX, [EDX+8] ;Node number
+	
+	mov ESI, [EDX+16]
+	mov EAX, EBX
+	cmp ESI, ECX ;Checking if we've arrived on the proper tree level
+	je a_return
+	
+
+	
+	
+	sub ECX, 1	;We will be checking children, so we move 1 level down
+	shr EBX, 1	;We're checking left child first
+
+	push ECX
+	push EDX
+
+	push EBX
+	push ECX
+	call kinternal_gettreeelement
+	add ESP, 8
+
+	pop EDX
+	pop ECX
+
+	mov ESI, [EDX+12]
+	and EAX, ESI
+
+	mov EDI, 0
+
+	cmp EAX, EDI
+
+	je a_call_recursively
+
+	add EBX, 1 ;Moving onto the right child (we do not need to read that one, because we know for a fact that one of the children allows for allocation and we determined that the left one doesn't)
+
+
+
+	a_call_recursively:
+
+	push ECX
+	push EDX
+	
+	mov EDI, [EDX+16]
+	push EDI
+	mov ESI, [EDX+12]
+	push ESI
+	push EBX
+	push ECX
+	call kinternal_allocate
+	add ESP, 16
+	
+	pop EDX
+	pop ECX
+
+	a_return:
+pop EDI
+pop ESI
+pop EBX
+pop EBP
+ret
 
 
 
