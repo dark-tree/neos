@@ -17,6 +17,52 @@ global kinternal_gettreeelement
 global kinternal_settreeelement
 global kinternal_buddify
 global kinternal_allocate
+global kfree
+
+
+;This function frees allocated memory area.
+;Takes 1 argument: (void* pointer) - that pointer can be anywhere withing the area you want to free
+kfree:
+mov EDX, ESP
+push EBP
+push EBX
+push ESI
+push EDI
+	mov EAX, [EDX+4]
+	mov EDX, 0
+	mov EBX, KMALLOC_BLOCK_SIZE
+	div EBX
+
+	push EAX
+	
+	push DWORD 0
+	push EAX
+	push DWORD 0
+	call kinternal_settreeelement
+	add ESP, 12
+
+	pop EAX
+
+
+	push EAX
+	push DWORD 0
+	call kinternal_full_buddify
+	add ESP, 8
+
+
+
+pop EDI
+pop ESI
+pop EBX
+pop EBP
+ret
+
+
+
+
+
+
+
 
 ;This function allocates a memory area of a given size
 ;Takes 1 argument: (uint32_t size)
