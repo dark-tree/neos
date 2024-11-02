@@ -71,5 +71,5 @@ section .data
 		dd 0x00CF9300
 
 	gdt_desc:
-		dw gdt_null - gdt_desc
+		dw gdt_desc - gdt_null
 		dd gdt_null
