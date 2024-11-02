@@ -13,7 +13,8 @@ KERNEL_CC = \
 	build/kernel/console.o \
 	build/kernel/print.o \
 	build/kernel/memory.o \
-	build/kernel/math.o
+	build/kernel/math.o \
+	build/kernel/floppy.o
 
 # Configuration
 CC_FLAGS = -nostdinc -fomit-frame-pointer -fno-builtin -nodefaultlibs -nostdlib -ffreestanding
@@ -78,12 +79,12 @@ clean:
 
 # Invoke QEMU wihtout waiting for GDB
 run: build/final.iso
-	qemu-system-i386 -monitor stdio -cdrom ./build/final.iso -boot a
+	qemu-system-i386 -monitor stdio -cdrom ./build/final.iso -boot a -drive file=./disks/floppy.img,if=floppy,index=1,format=raw
 
 # Invoke QEMU and wait for GDB
 debug: build/final.iso
-	qemu-system-i386 -cdrom ./build/final.iso -boot a -s -S &
-	gdb -ex 'target remote localhost:1234' -ex 'break *0x7c00' -ex 'c'
+	qemu-system-i386 -cdrom ./build/final.iso -boot a -s -S -drive file=./disks/floppy.img,if=floppy,index=1,format=raw &
+	gdb -ex 'target remote localhost:1234' -ex 'break *0x7c00' -ex 'break *0x8000' -ex 'c'
 
 disasm: build/bootloader.bin
 	ndisasm -b 16 -o 7c00h ./build/bootloader.bin
