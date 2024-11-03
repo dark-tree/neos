@@ -6,7 +6,8 @@ $(foreach bin,$(REQUIRED_BINS), $(if $(shell command -v $(bin) 2> /dev/null),$(t
 # Kernel assembly object files
 KERNEL_AS = \
 	build/kernel/kmalloc.o \
-	build/kernel/tables.o
+	build/kernel/tables.o \
+	build/kernel/routine.o
 
 # Kernel C object files
 KERNEL_CC = \
@@ -80,7 +81,8 @@ clean:
 
 # Invoke QEMU wihtout waiting for GDB
 run: build/final.iso
-	qemu-system-i386 -monitor stdio -cdrom ./build/final.iso -boot a
+	rm -f ./output
+	qemu-system-i386 -monitor stdio -cdrom ./build/final.iso -boot a -d cpu_reset -D ./output
 
 # Invoke QEMU and wait for GDB
 debug: build/final.iso
