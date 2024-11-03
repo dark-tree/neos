@@ -14,6 +14,7 @@ KERNEL_CC = \
 	build/kernel/print.o \
 	build/kernel/memory.o \
 	build/kernel/math.o \
+	build/kernel/io.o \
 	build/kernel/floppy.o
 
 # Configuration

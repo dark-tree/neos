@@ -1,9 +1,17 @@
 #include "floppy.h"
-
+#include "io.h"
 #include "print.h"
 #include "types.h"
 
-/* floppy disk IO functions */
+//#define FLOPPY_DEBUG_ON
+
+#ifdef FLOPPY_DEBUG_ON
+    #define floppy_debug_msg(...) kprintf(__VA_ARGS__)
+#else
+    #define floppy_debug_msg(...)
+#endif
+
+#define FLOPPY_144_SECTORS_PER_TRACK 18
 
 enum FloppyRegisters
 {
@@ -77,32 +85,42 @@ enum FloppyConfigure
     THRESHOLD_MASK = 0x0F           // FIFO threshold value
 };
 
-static void outb(uint16_t port, uint8_t data){
-    __asm__ volatile ("outb %0, %1" : : "a" (data), "Nd" (port));
-}
+enum FloppyOptionBits
+{
+    MT_BIT = 0x80,      // Multitrack: The controller will switch automatically from Head 0 to Head 1 at the end of the track. This allows you to read/write twice as much data with a single command. 
+    MFM_BIT = 0x40,     // MFM
+    SK_BIT = 0x20,      // Skip deleted sectors
+};
 
-static uint8_t inb(uint16_t port){
-    uint8_t result;
-    __asm__ volatile ("inb %1, %0" : "=a" (result) : "Nd" (port));
-    return result;
-}
+/* private */
 
-static bool floppy_wait_ready(uint32_t timeout){
+static bool floppy_wait_msr(uint32_t timeout, uint8_t mask, uint8_t value){
     uint8_t msr = 0;
 	for(uint32_t i = 0; i < timeout; i++){
         msr = inb(MAIN_STATUS_REGISTER);
-        // if controller is ready for a command and not expecting an IN opcode
-		if(msr & RQM && !(msr & DIO)){
+		if((msr & mask) == value){
 			return true;
 		}
 	}
-    kprintf("Error: Floppy not ready after timeout: %d, MSR: 0x%x\n", timeout, msr);
+    floppy_debug_msg("Timeout after: %d, MSR: 0x%x (RQM: %d/%c, DIO: %d/%c, NDMA: %d/%c, BUSY: %d/%c)\n", timeout, msr, 
+        (msr & RQM) > 0, (mask & RQM) ? (value & RQM) ? '1' : '0' : 'x',
+        (msr & DIO) > 0, (mask & DIO) ? (value & DIO) ? '1' : '0' : 'x',
+        (msr & NDMA) > 0, (mask & NDMA) ? (value & NDMA) ? '1' : '0' : 'x',
+        (msr & BUSY) > 0, (mask & BUSY) ? (value & BUSY) ? '1' : '0' : 'x');
     return false;
 }
 
+static bool floppy_wait_ready(uint32_t timeout){
+    return floppy_wait_msr(timeout, RQM, RQM);
+}
+
+static bool floppy_wait_ready_send(uint32_t timeout){
+    return floppy_wait_msr(timeout, RQM | DIO, RQM);
+}
+
 static void floppy_send_command(uint8_t command){
-    if(!floppy_wait_ready(0xffffff)){
-        kprintf("Error: Floppy not ready while sending command\n");
+    if(!floppy_wait_ready_send(0xffffff)){
+        floppy_debug_msg("Error: Floppy not ready while sending command\n");
         return;
     }
 
@@ -115,7 +133,7 @@ static uint8_t get_version(){
     uint8_t version = inb(DATA_FIFO);
 
     // after receiving the version, the controller should be ready
-    if(!floppy_wait_ready(0xffffff)){
+    if(!floppy_wait_ready_send(0xffffff)){
         return 0;
     }
     return version;
@@ -126,32 +144,133 @@ static bool floppy_calibrate(uint8_t drive){
     floppy_send_command(drive);
 
     if(!floppy_wait_ready(0xffffff)){
-        kprintf("Error: Floppy not ready after recalibrate\n");
+        floppy_debug_msg("Error: Floppy not ready after recalibrate\n");
         return false;
     }
 
     floppy_send_command(SENSE_INTERRUPT);
     uint8_t status = inb(DATA_FIFO);
-    kprintf("Calibrate status: 0x%x\n", status);
+    floppy_debug_msg("Calibrate status: 0x%x\n", status);
     uint8_t cylinder = inb(DATA_FIFO);
-    kprintf("Calibrate cylinder: %d\n", cylinder);
+    floppy_debug_msg("Calibrate cylinder: %d\n", cylinder);
 
     if(cylinder != 0 || status != (0x20 | drive)){
-        kprintf("Error: Floppy calibration failed\n");
+        floppy_debug_msg("Error: Floppy calibration failed\n");
         return false;
     }
 
     return true;
 }
 
-void floppy_init(){
+static bool floppy_seek(uint8_t head, uint8_t cylinder){
+    for (int i = 0; i < 10; i++){
+        floppy_send_command(SEEK);
+        floppy_send_command(head << 2 | DRIVE1);
+        floppy_send_command(cylinder);
+
+        if(!floppy_wait_ready(0xffffff)){
+            floppy_debug_msg("Error: Floppy not ready after seek\n");
+            return false;
+        }
+
+        floppy_send_command(SENSE_INTERRUPT);
+        uint8_t status = inb(DATA_FIFO);
+        floppy_debug_msg("Seek status: 0x%x\n", status);
+        uint8_t cylinder_result = inb(DATA_FIFO);
+        floppy_debug_msg("Seek cylinder: %d\n", cylinder);
+
+        if(cylinder == cylinder_result){
+            return true;
+        }
+    }
+
+    floppy_debug_msg("Error: Floppy seek failed\n");
+    return false;
+}
+
+static bool floppy_read_sector(uint8_t head, uint8_t cylinder, uint8_t sector, uint8_t* buffer){
+    if(!floppy_seek(head, cylinder)){
+        return false;
+    }
+
+    // read sector
+    floppy_send_command(READ_DATA | MFM_BIT | SK_BIT); // MT_BIT
+    floppy_send_command(head << 2 | DRIVE1);
+    floppy_send_command(cylinder);
+    floppy_send_command(head);
+    floppy_send_command(sector); // first sector
+    floppy_send_command(2); // sector size = 512 bytes
+    floppy_send_command(sector); // last sector
+    floppy_send_command(0x1b); // gap length
+    floppy_send_command(0xff); // data length
+
+    if(!floppy_wait_ready(0xffffff)){
+        floppy_debug_msg("Error: Floppy not ready after read\n");
+        return false;
+    }
+
+    // read data
+    uint32_t i = 0;
+    while (true){
+        if (!floppy_wait_msr(0x1, RQM | DIO | NDMA, RQM | NDMA | DIO) || i > 512){
+            break;
+        }
+        uint8_t data = inb(DATA_FIFO);
+        buffer[i] = data;
+        if (i < 32) {
+            floppy_debug_msg("%x ", data);
+            if (i % 16 == 15){
+                floppy_debug_msg("\n");
+            }
+        }
+        i++;
+    }
+
+    floppy_debug_msg("Read %d bytes\n", i);
+    if (i != 512){
+        floppy_debug_msg("Error: Floppy read failed\n");
+        return false;
+    }
+
+    uint8_t st0 = inb(DATA_FIFO);
+    uint8_t st1 = inb(DATA_FIFO);
+    uint8_t st2 = inb(DATA_FIFO);
+    uint8_t result_cylinder = inb(DATA_FIFO);
+    uint8_t result_head = inb(DATA_FIFO);
+    uint8_t result_sector = inb(DATA_FIFO);
+    uint8_t result_2 = inb(DATA_FIFO);
+    floppy_debug_msg("ST0: 0x%x, ST1: 0x%x, ST2: 0x%x, Cylinder: %d, Head: %d, Sector: %d, 2: %d\n", st0, st1, st2, result_cylinder, result_head, result_sector, result_2);
+
+    if ((st0 & 0xC0) || result_cylinder != cylinder || result_head != head || result_sector != sector || result_2 != 2){
+        floppy_debug_msg("Error: Floppy read failed\n");
+        return false;
+    }
+
+    return true;
+}
+
+static void lba_to_chs(uint32_t lba, uint8_t* cylinder, uint8_t* head, uint8_t* sector){
+    *cylinder = lba / (2 * FLOPPY_144_SECTORS_PER_TRACK);
+    *head = ((lba % (2 * FLOPPY_144_SECTORS_PER_TRACK)) / FLOPPY_144_SECTORS_PER_TRACK);
+    *sector = ((lba % (2 * FLOPPY_144_SECTORS_PER_TRACK)) % FLOPPY_144_SECTORS_PER_TRACK + 1);
+}
+
+static bool floppy_read_lba(uint32_t lba, uint8_t* buffer){
+    uint8_t head, cylinder, sector;
+    lba_to_chs(lba, &cylinder, &head, &sector);
+    return floppy_read_sector(head, cylinder, sector, buffer);
+}
+
+/* public */
+
+bool floppy_init(){
     /*======== verify version ========*/
     uint8_t version = get_version();
-    kprintf("Floppy version: %x\n", version);
+    floppy_debug_msg("Floppy version: %x\n", version);
 
     if (version != 0x90){
-        kprintf("Floppy version not supported\n");
-        return;
+        floppy_debug_msg("Floppy version not supported\n");
+        return false;
     }
 
     /*======== configure procedure ========*/
@@ -164,11 +283,11 @@ void floppy_init(){
     /*======== lock configuration ========*/
     floppy_send_command(LOCK | 0x80);
     uint8_t lock_result = inb(DATA_FIFO);
-    kprintf("Lock result: 0x%x\n", lock_result);
+    floppy_debug_msg("Lock result: 0x%x\n", lock_result);
 
     if (!(lock_result & 0x10)){
-        kprintf("Error: Floppy configuration lock failed\n");
-        return;
+        floppy_debug_msg("Error: Floppy configuration lock failed\n");
+        return false;
     }
 
     /*========= reset ==========*/
@@ -186,9 +305,9 @@ void floppy_init(){
     for(uint8_t i = 0; i < 4; i++){
         floppy_send_command(SENSE_INTERRUPT);
         uint8_t status = inb(DATA_FIFO);
-        kprintf("Reset status: 0x%x\n", status);
+        floppy_debug_msg("Reset status: 0x%x\n", status);
         uint8_t cylinder = inb(DATA_FIFO);
-        kprintf("Reset cylinder: %d\n", cylinder);
+        floppy_debug_msg("Reset cylinder: %d\n", cylinder);
     }
 
     /*======== specify drive parameters ========*/
@@ -198,10 +317,39 @@ void floppy_init(){
 
     // recalibrate drive
     if(!floppy_calibrate(DRIVE1)){
-        return;
+        return false;
     }
 
-    kprintf("Floppy initialized successfully\n");
+    floppy_debug_msg("Floppy initialized successfully\n");
+    return true;
 }
 
+bool floppy_read(void* buffer, uint32_t address, uint32_t size){
+    uint8_t tmp_buffer[512];
 
+    uint32_t start_lba = address / 512;
+    uint32_t end_lba = (address + size) / 512;
+
+    for (uint32_t lba = start_lba; lba <= end_lba; lba++){
+        if (!floppy_read_lba(lba, tmp_buffer)){
+            return false;
+        }
+
+        uint32_t start = 0;
+        uint32_t end = 512;
+        if (lba == start_lba){
+            start = address % 512;
+        }
+        if (lba == end_lba){
+            end = (address + size) % 512;
+        }
+
+        for (uint32_t i = start; i < end; i++){
+            ((uint8_t*)buffer)[i + (lba - start_lba) * 512] = tmp_buffer[i];
+        }
+    }
+
+    return true;
+}
+
+// 13:00
