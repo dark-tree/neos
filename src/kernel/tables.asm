@@ -23,6 +23,9 @@ idtr_store:
 	push ebp
 	mov ebp, esp
 
+	; Multiply entry count by entry size
+	shl edx, 3
+
 	; Allocate space for the 6-byte-long IDTR on stack
 	sub esp, 6
 
@@ -76,8 +79,8 @@ gdtr_store:
 gdtr_switch:
 
 	; Those two registers need not be preserved as per CDECL
-	mov edx, [esp+8] ; Code segment index
-	mov eax, [esp+4] ; Data segment index
+	mov edx, [esp + 8] ; Code segment index
+	mov eax, [esp + 4] ; Data segment index
 
 	; Shift indices left by 3 bits so that RPL and TI are both 0
 	shl edx, 3

@@ -7,7 +7,8 @@ $(foreach bin,$(REQUIRED_BINS), $(if $(shell command -v $(bin) 2> /dev/null),$(t
 KERNEL_AS = \
 	build/kernel/kmalloc.o \
 	build/kernel/tables.o \
-	build/kernel/routine.o
+	build/kernel/routine.o \
+	build/kernel/pic.o
 
 # Kernel C object files
 KERNEL_CC = \

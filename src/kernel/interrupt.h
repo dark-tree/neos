@@ -1,6 +1,6 @@
 #pragma once
 
-typedef void (*interupt_hander) (int number, void* user);
+typedef void (*interupt_hander) (int number, int error);
 
 void idt_init();
 void idt_register(int interupt, interupt_hander handler, void* user);

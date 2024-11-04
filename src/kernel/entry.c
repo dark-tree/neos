@@ -5,6 +5,7 @@
 #include "interrupt.h"
 
 extern char test();
+extern void pic_disable();
 
 #define X "\xDB"
 #define S " "
@@ -22,7 +23,14 @@ void start() {
 	kprintf("\e[29C" X S S S X S X X X X S S X X X S S X X X X"\n");
 	kprintf("\e[29C" " Linux Compatible OS\n");
 
+	pic_disable();
 	idt_init();
+
+	kprintf("Ready!\n");
+
+	__asm("int $0x80");
+
+
 
 	while (true) {
 		__asm("hlt");
