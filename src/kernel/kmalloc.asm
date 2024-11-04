@@ -26,56 +26,79 @@ global krealloc
 ;Thsi function takes an allocated memory area and makes it larger (Note: the area will be moved and the memory copied, if necesarry)
 ;Takes 2 arguments (void* pointer, uint32_t new_size), returns a pointer to the new area.
 krealloc:
+
+; We use ECX in place of EBP to make it debugable in GCC
 mov ECX, ESP
 sub ESP, 4
+
 push EBP
 push EBX
 push ESI
 push EDI
+
+	; Load 'pointer'
 	mov EAX, [ECX+4]
+
+	; Convert pointer to segment number
 	mov EDX, 0
 	mov EBX, KMALLOC_BLOCK_SIZE
 	div EBX
-	mov EDI, EAX	;Block number
+	mov EDI, EAX
+
+	; Store segment number
 	mov [ECX-4], EDI
 
-	mov ESI, 0 ;Tree level
-	
+	; Tree level
+	xor ESI, ESI
+
+	; Save stack for later
 	push ECX
 
 	jmp ra_ptl1_start
 
-	ra_ptl1:	;THis loop determines how large is the allocated area currently (value will be stored in ESI as a power of 2 (2^ESI)
-	add ESI, 1
+	; This loop determines how large is the allocated area currently (value will be stored in ESI as a power of 2 (2^ESI)
+	ra_ptl1:
+	inc ESI
 	shr EDI, 1
 
 	ra_ptl1_start:
-	push EDI
-	push ESI
-	call kinternal_gettreeelement
+	push EDI ; Element number (segment for level = 0)
+	push ESI ; Tree level
+		call kinternal_gettreeelement
 	add ESP, 8
 
-	mov EDX, 0
-	cmp EAX, EDX
-	je ra_ptl1
+	; Restart loop if element is empty (all bits equal to 0)
+	test EAX, EAX
+	jz ra_ptl1
 
+	; We now have tree level of first non-zero element
+	; "above" the given segment in ESI (0 based)
+
+	; Restore our funky stack pointer
 	pop ECX
 
-
+	; Load 'new_size'
 	mov EAX, [ECX+8]
-	mov EDX, 0
+
+	; ... and covert it to segments, and saves it in EAX
+	xor EDX, EDX
 	mov EBX, KMALLOC_BLOCK_SIZE
 	div EBX
 
-	mov EBX, 0
+	; Calculate greater or equal power of two
+	xor EBX, EBX
 	mov EDX, 1
 	jmp ra_ptl2_start
+
 	ra_ptl2:
-	shl EDX, 1
-	add EBX, 1
+		shl EDX, 1
+		inc EBX
+
 	ra_ptl2_start:
-	cmp EDX, EAX
-	jb ra_ptl2
+		cmp EDX, EAX
+		jb ra_ptl2
+
+	; EBX now contains the greater or equal to segment number power of two
 
 	cmp ESI, EBX
 	mov EAX, [ECX+4]
@@ -99,19 +122,20 @@ push EDI
 	shr EAX, CL
 
 	push EAX
+	push EAX
 	push EBX
 	call kinternal_gettreeelement
 	add ESP, 8
 
+	test EAX, EAX
+	pop EAX
 	pop ECX
-
-	mov EDX, 0
-	cmp EAX, EDX
-	jne ra_move
+	jnz ra_move
 
 	push ECX
-	
-	push EAX	;This is for the buddify call below
+
+	;This is for the buddify call below
+	push EAX
 
 	push DWORD 0xFFFFFFFF
 	push EAX
@@ -433,7 +457,7 @@ ret
 
 
 
-;This function updates the node, so that it contains accurate information about block availibility. It does so, based on it's immediate children, so this function needs to be called on the entire tree branch at once, bottom to the top. 
+;This function updates the node, so that it contains accurate information about block availibility. It does so, based on it's immediate children, so this function needs to be called on the entire tree branch at once, bottom to the top.
 ;Takes 2 arguments: (uint32_t tree_level, uint32_t node_number), returns nothing
 kinternal_buddify:
 mov ECX, ESP
@@ -445,7 +469,7 @@ push EDI
 	sub EBP, 1	;EBP contains level, where the dildren of this node are located
 	mov EBX, [ECX+8]
 	shl EBX, 1	;EBX containes index of the left child
-	
+
 	push ECX
 	push EDX
 	push EBX
@@ -480,7 +504,7 @@ push EDI
 	or EAX, EDX	;If result of this is 0 - the the largest possible area (for example 8 segments in level-3 node can be allocated, because it means that both 4-segment level-2 nodes are free)
 	shl EAX, CL
 	shl EAX, 1	;Returning this bit to the appropriate spot (oldest bit of this node)
-	
+
 
 	or EBX, EAX	;Now EBX contains value this node should have
 
@@ -504,7 +528,7 @@ ret
 
 
 ;Function takes 2 arguments: (uint32_t tree level, uint32_t node number)
-;Returns an uint32_t, with the contains bits of that node (N youngest bits, where N-1 == level) 
+;Returns an uint32_t, with the contains bits of that node (N youngest bits, where N-1 == level)
 kinternal_gettreeelement:
 push EBP
 mov EBP, ESP
@@ -520,7 +544,7 @@ push EDI
 
 	mov ESI, [EBP+8]
 	mov EBX, tree_levels
-	mov ESI,  [EBX+8*ESI+4]	;All levels are tables, ESI register will contain a pointer to the one we need 
+	mov ESI,  [EBX+8*ESI+4]	;All levels are tables, ESI register will contain a pointer to the one we need
 
 	mov EBX, 8
 	mov EDX, 0
@@ -539,7 +563,7 @@ push EDI
 	shr EAX, 8
 	mov BL, AL
 	mov EAX, EBX
-	
+
 	mov ECX, EDX
 	shl EAX, CL	;Bits we needed were somewhere in the middle of the EAX register, now those are the oldes bits
 
@@ -557,7 +581,7 @@ ret
 
 
 ;Function takes 3 arguments: (uint32_t tree_level, uint32_t node_number, uint32_t new_value)
-;Note: only tree_level+1 youngest bits from the new_value will be used 
+;Note: only tree_level+1 youngest bits from the new_value will be used
 kinternal_settreeelement:
 push EBP
 mov EAX, ESP
@@ -577,7 +601,7 @@ push EDI
 
 	mov ESI, [EAX+8]
 	mov EBX, tree_levels
-	mov ESI, [EBX+8*ESI+4]	;All levels are tables, ESI register will contain a pointer to the one we need 
+	mov ESI, [EBX+8*ESI+4]	;All levels are tables, ESI register will contain a pointer to the one we need
 
 	mov EBX, 8
 	mov EDX, 0
@@ -698,10 +722,10 @@ push EDI
 	add EDI, 1
 	cmp EDI, EDX
 	jb it_ptl4
-	
+
 	pop EDX
-	
-	
+
+
 	push ECX
 
 	mov EDI, [tree_levels]	;Size of the array represening level 0
@@ -711,19 +735,19 @@ push EDI
 	add EDI, [offset]
 
 	;Now we are allocating memory for all tree levels:
-	mov ECX, [tree_levels]	
+	mov ECX, [tree_levels]
 	shr ECX, 1	;Node number on level 1 (twice less than level 0 - its a binary tree)
 	mov EAX, 1	;Level number
 	mov EBX, 2	;Bits per node on this level
 	it_ptl3:
 		;First we set the descriptor for the current level
-		
+
 		mov EBP, tree_levels
 		;Descriptor of each tree level takes up 8 bytes
 		mov [8*EAX + EBP], ECX	;Setting size of this tree level
 		mov [8*EAX + EBP + 4], EDI	;Setting pointer to this tree level
 		mov [max_tree_level], EAX	;Updating the information on what the current highest level is
-		
+
 		push EDX
 		push EAX
 		mov EDX, 0
@@ -731,8 +755,8 @@ push EDI
 		mul EBX		;Bits per node multiplied by level size - how many bits does the current level take up
 		sub EAX, 1
 		shr EAX, 3	;How many bytes does the current level take up (dividing number of bits by 8, but first subtracting 1 and then adding 1, in order to round up the number)
-		add EAX, 1	
-		add EDI,EAX	;Calculating pointer to the next level, by taking pointer to the pravious level and adding it's size. 
+		add EAX, 1
+		add EDI,EAX	;Calculating pointer to the next level, by taking pointer to the pravious level and adding it's size.
 		pop EAX
 		pop EDX
 
@@ -749,7 +773,7 @@ push EDI
 
 
 	pop ECX
-	
+
 	;We initialize last X nodes in the lowest tree level with 1s (that's because those represent non-existent blocks, so we mark them as allocated from the start)
 	mov EAX, [block_number]
 	cmp EAX, ECX
@@ -818,12 +842,12 @@ push EBX
 	mov EBX, CONTROL_STRUCTURE_BYTES_PER_BLOCK
 	mov EDX, 0
 	mul EBX
-	mov EBX, [size]	;Calculating the size of the control structure 
+	mov EBX, [size]	;Calculating the size of the control structure
 	sub EBX, EAX	;Calculating offset of the control structure0x8
 	mov [end], EBX		;At the end of the managed domain there will be information about reserved blocks stored, this number represents where it starts.
 	mov EAX, [EBP+12]
 	mov [offset], EAX	;Save area offset
-	
+
 
 	;Initializing the tree (this function is taking parameters from this global variables)
 	call kinternal_initializetree
@@ -859,7 +883,7 @@ size: dd 0
 offset: dd 0
 block_number: dd 0
 
-tree_levels: times 64 dd 0 
+tree_levels: times 64 dd 0
 ;Pointers to the tree structure controlling memory allocation
 ;Structure:
 ;	4 bytes		|	4 bytes
@@ -869,4 +893,3 @@ tree_levels: times 64 dd 0
 ;	...		|...
 ;
 ;	Levels are numbered from the lowest (level 0 is leaves)
-
