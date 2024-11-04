@@ -528,7 +528,7 @@ void con_scroll(int offset) {
 		memmove(con_at(0, 0), con_at(0, lines), moves * row);
 		memset(con_at(0, moves), 0, clears * row);
 
-		y += lines;
+		y -= lines;
 		if (y < 0) y = 0;
 
 		return;
