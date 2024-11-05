@@ -4,12 +4,11 @@ bits 32
 
 section .text
 
-extern con_write
+; See tables.h
 extern gdtr_switch
 
 global isr_register
 global isr_init
-global isr_wrap
 
 %macro define_isr 2
 	push dword 1
@@ -96,14 +95,15 @@ isr_register:
 
 	ret
 
-; idt_write(int index, void* offset, int gdt_index)
+; idt_write(int index, void* offset, int gdt_index, void* table)
 isr_wrap:
 
-	mov edx, [esp+8] ; Interupt Service Routine pointer
-	mov ecx, [esp+4] ; Interupt number
+	mov eax, [esp+16] ; Address of the Interrupt Descriptor Table
+	mov edx, [esp+8]  ; Interupt Service Routine pointer
+	mov ecx, [esp+4]  ; Interupt number
 
 	; Calculate entry index
-	lea eax, [ecx * 8]
+	lea eax, [eax + ecx * 8]
 
 	; Copy GDT index into IDT entry
 	movzx ecx, word [esp+12]
@@ -121,8 +121,13 @@ isr_wrap:
 	ret
 
 isr_init:
+
 	push ebp
 	mov ebp, esp
+
+	; Load IDT offset onto the stack, this will
+	; Be used dering isr_wrap calls in define_isr
+	push dword [esp+8]
 
 	;            int, hec
 	define_isr  0x00,   0 ; Divide by 0
@@ -157,7 +162,6 @@ isr_init:
 	define_isr  0x1D,   0 ; VMM Communication Exception
 	define_isr  0x1E,   0 ; Security Exception
 	define_isr  0x1F,   0 ; Reserved
-
 	define_isr  0x70,   0 ; IRQ 8:  RTC
 	define_isr  0x71,   0 ; IRQ 9:  Unassigned
 	define_isr  0x72,   0 ; IRQ 10: Unassigned

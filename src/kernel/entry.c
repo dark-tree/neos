@@ -26,13 +26,11 @@ void start() {
 	pic_disable();
 	idt_init();
 
-	kprintf("Ready!\n");
+	kprintf("System ready!\n");
 
 	__asm("int $0x80");
+	__asm("int $0x00");
 
-
-
-	while (true) {
-		__asm("hlt");
-	}
+	// never return to the bootloader
+	halt();
 }
