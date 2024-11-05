@@ -3,7 +3,7 @@
 /**
  * @brief Signature of the function that will be invoked by the Interrupt Service Routine
  */
-typedef void (*interrupt_hander) (int number, int error);
+typedef void (*interrupt_hander) (int number, int error, int eax, int ecx, int edx, int ebx, int esi, int edi);
 
 /**
  * @brief Initializes the contents of the Interrupt Descriptor Table
@@ -19,8 +19,8 @@ extern void isr_init(void* offset);
  * @brief Register CDECL interrupt handler for the specificed interrupt number,
  *        if an interrupt that has no registered C handler is invoked it will be ignored.
  *
- * @param[in] interrupt The interrupt number of the interrupt to handle, see table in routine.asm
- * @param[in] handler   Pointer to a CDECL function to invoke at the interrupt
+ * @param[in] interrupt The interrupt number of the interrupt to handle, see table in routine.asm.
+ * @param[in] handler   Pointer to a CDECL function to invoke at the interrupt.
  *
  * @return None.
  */

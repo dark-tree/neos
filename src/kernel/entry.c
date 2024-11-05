@@ -3,6 +3,7 @@
 #include "console.h"
 #include "print.h"
 #include "interrupt.h"
+#include "util.h"
 
 extern char test();
 extern void pic_disable();
@@ -24,13 +25,20 @@ void start() {
 	kprintf("\e[29C" " Linux Compatible OS\n");
 
 	pic_disable();
-	idt_init();
+	int_init();
 
 	kprintf("System ready!\n");
 
+	// wait for one timer pulse (just a simple interrupt test)
+	int_lock(0x20);
 	__asm("int $0x80");
 	__asm("int $0x80");
+	__asm("int $0x80");
+	int_wait();
+
+	kprintf("Halting!\n");
 
 	// never return to the bootloader
 	halt();
+
 }

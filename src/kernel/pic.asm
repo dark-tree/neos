@@ -96,6 +96,7 @@ pic_isr:
 
 	ret
 
+; This function doesn't clobber the arguments
 pic_remap:
 
 	; Load (and save) base interrupt offset number

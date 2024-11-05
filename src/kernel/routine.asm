@@ -13,6 +13,9 @@ extern pic_isr
 extern pic_irq
 extern pic_accept
 
+; See interrupt.c
+extern int_common_handle
+
 global isr_register
 global isr_init
 
@@ -39,6 +42,9 @@ isr_tail:
 	; Pushes edi, esi, ebp, esp, ebx, edx, ecx, eax
 	pusha
 
+	; Pointer to the extended parameter block
+	mov ebp, esp
+
 	; Clear high 16 bits so nothing happens to our segments
 	xor eax, eax
 
@@ -59,15 +65,25 @@ isr_tail:
 	add esp, 8
 
 	; Interrupt error code
-	mov edx, [esp+44]
+	mov edx, [esp + 44]
 
 	; Interrupt number
-	mov eax, [esp+40]
+	mov eax, [esp + 40]
 
-	; Load CDECL handler pointer, we use preserved register here
+	; Load CDECL handler pointer, we use a preserved register here
 	mov esi, [service_table + eax * 4]
 
+	; Used by int_common_handler
+	push eax
+
 	; Those will become the handler call arguments
+	push dword [ebp + 4 * 0] ; EDI
+	push dword [ebp + 4 * 1] ; ESI
+	push dword [ebp + 4 * 4] ; EBX
+	push dword [ebp + 4 * 5] ; EDX
+	push dword [ebp + 4 * 6] ; ECX
+	push dword [ebp + 4 * 7] ; EAX
+
 	push edx
 	push eax
 
@@ -122,7 +138,11 @@ isr_tail:
 	isr_tail_no_handle:
 
 	; Arguments were pushed before so we always pop them here
-	add esp, 8
+	add esp, 4*8
+
+	; Call this always, used by the "wait" subsystem
+	call int_common_handle
+	add esp, 4
 
 	; This alignes with the saved segments from before
 	call gdtr_switch
@@ -149,7 +169,7 @@ isr_register:
 
 	ret
 
-; idt_write(int index, void* offset, int gdt_index, void* table)
+; This function doesn't clobber the arguments
 isr_wrap:
 
 	mov eax, [esp+16] ; Address of the Interrupt Descriptor Table
@@ -179,8 +199,8 @@ isr_init:
 	push ebp
 	mov ebp, esp
 
-	; Load IDT offset onto the stack, this will
-	; Be used dering isr_wrap calls in define_isr
+	; Load IDT offset onto the stack, this will be used during isr_wrap calls in define_isr
+	; This is technically not allowed by CDECL but we will do it here anyway
 	push dword [esp+8]
 
 	;            int, hec
