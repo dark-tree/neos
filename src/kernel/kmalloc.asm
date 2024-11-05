@@ -18,6 +18,144 @@ global kinternal_settreeelement
 global kinternal_buddify
 global kinternal_allocate
 global kfree
+global krealloc
+
+
+
+
+;Thsi function takes an allocated memory area and makes it larger (Note: the area will be moved and the memory copied, if necesarry)
+;Takes 2 arguments (void* pointer, uint32_t new_size), returns a pointer to the new area.
+krealloc:
+mov ECX, ESP
+sub ESP, 4
+push EBP
+push EBX
+push ESI
+push EDI
+	mov EAX, [ECX+4]
+	mov EDX, 0
+	mov EBX, KMALLOC_BLOCK_SIZE
+	div EBX
+	mov EDI, EAX	;Block number
+	mov [ECX-4], EDI
+
+	mov ESI, 0 ;Tree level
+	
+	push ECX
+
+	jmp ra_ptl1_start
+
+	ra_ptl1:	;THis loop determines how large is the allocated area currently (value will be stored in ESI as a power of 2 (2^ESI)
+	add ESI, 1
+	shr EDI, 1
+
+	ra_ptl1_start:
+	push EDI
+	push ESI
+	call kinternal_gettreeelement
+	add ESP, 8
+
+	mov EDX, 0
+	cmp EAX, EDX
+	je ra_ptl1
+
+	pop ECX
+
+
+	mov EAX, [ECX+8]
+	mov EDX, 0
+	mov EBX, KMALLOC_BLOCK_SIZE
+	div EBX
+
+	mov EBX, 0
+	mov EDX, 1
+	jmp ra_ptl2_start
+	ra_ptl2:
+	shl EDX, 1
+	add EBX, 1
+	ra_ptl2_start:
+	cmp EDX, EAX
+	jb ra_ptl2
+
+	cmp ESI, EBX
+	mov EAX, [ECX+4]
+	jae ra_return
+
+	mov EAX, [ECX+4]
+
+	push ECX
+
+	push EAX
+	call kfree
+	add ESP, 4
+
+	pop ECX
+
+	mov EAX, [ECX-4]
+
+	push ECX
+
+	mov ECX, EBX
+	shr EAX, CL
+
+	push EAX
+	push EBX
+	call kinternal_gettreeelement
+	add ESP, 8
+
+	pop ECX
+
+	mov EDX, 0
+	cmp EAX, EDX
+	jne ra_move
+
+	push ECX
+	
+	push EAX	;This is for the buddify call below
+
+	push DWORD 0xFFFFFFFF
+	push EAX
+	push EBX
+	call kinternal_settreeelement
+	add ESP, 12
+
+	;Here EAX is already pushed, so I only push the other argument
+	push EBX
+	call kinternal_full_buddify
+	add ESP, 8
+
+	pop ECX
+
+	mov EAX, [ECX+4]
+
+	jmp ra_return
+	ra_move:
+
+	mov EAX, [ECX+8]
+	push ECX
+
+	push EAX
+	call kmalloc
+	add ESP, 4
+
+	pop ECX
+
+
+	ra_return:
+pop EDI
+pop ESI
+pop EBX
+pop EBP
+add ESP, 4
+ret
+
+
+
+
+
+
+
+
 
 
 ;This function frees allocated memory area.
@@ -31,10 +169,10 @@ push EDI
 	mov EAX, [EDX+4]
 	mov EDX, 0
 	mov EBX, KMALLOC_BLOCK_SIZE
-	div EBX
+	div EBX		;Determining which segment the pointer points to
 
 	push EAX
-	
+
 	push DWORD 0
 	push EAX
 	push DWORD 0
@@ -134,13 +272,13 @@ push EDI
 	push ECX
 	push EDX
 	push EAX
-	
+
 	push DWORD 0xFFFFFFFF
 	push EAX
 	push ECX
 	call kinternal_settreeelement
 	add ESP, 12
-	
+
 	pop EAX
 	pop EDX
 	pop ECX
@@ -154,7 +292,7 @@ push EDI
 	push ECX
 	call kinternal_full_buddify
 	add ESP, 8
-	
+
 	pop EDX
 	pop ECX
 	pop EAX
@@ -164,7 +302,7 @@ push EDI
 	mov EDX, 0
 	mov EBX, KMALLOC_BLOCK_SIZE
 	mul EBX
-	
+
 
 	m_return:
 pop EDI
@@ -184,15 +322,15 @@ push ESI
 push EDI
 	mov ECX, [EDX+4] ;Tree level
 	mov EBX, [EDX+8] ;Node number
-	
+
 	mov ESI, [EDX+16]
 	mov EAX, EBX
 	cmp ESI, ECX ;Checking if we've arrived on the proper tree level
 	je a_return
-	
 
-	
-	
+
+
+
 	sub ECX, 1	;We will be checking children, so we move 1 level down
 	shl EBX, 1	;We're checking left child first
 
@@ -224,7 +362,7 @@ push EDI
 
 	push ECX
 	push EDX
-	
+
 	mov EDI, [EDX+16]
 	push EDI
 	mov ESI, [EDX+12]
@@ -233,7 +371,7 @@ push EDI
 	push ECX
 	call kinternal_allocate
 	add ESP, 16
-	
+
 	pop EDX
 	pop ECX
 
@@ -279,7 +417,7 @@ fb_ptl1:
 	pop ECX
 	pop EDX
 	pop EAX
-	
+
 
 cmp EBX, EAX
 jb fb_ptl1

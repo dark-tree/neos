@@ -46,32 +46,35 @@ void start() {
 	
 	kmalloc(200);
 	kmalloc(200);
+	kmalloc(400);
 	void* ptr2 = kmalloc(400);
-	kmalloc(400);
-	void* ptr = kmalloc(800);
-	void* ptr3 = kmalloc(200);
-	kmalloc(400);
+	//kmalloc(400);
+	//void* ptr = kmalloc(800);
+	//void* ptr3 = kmalloc(200);
+	//kmalloc(400);
 
 	
 	kprintf("%d\n", kinternal_allocate(4, 0,  0b100, 2));
 	kprintf("%d\n", kinternal_gettreeelement(1, 7)); 
 
 	kprintf("\n\n");
-	kprintf("%d %d", *((uint8_t*)testtreepointer(0)), *((uint8_t*)(testtreepointer(0)+1)));
-	kprintf("\n%d %d", *((uint8_t*)testtreepointer(1)), *((uint8_t*)(testtreepointer(1)+1)));
-	kprintf("\n%d %d", *((uint8_t*)testtreepointer(2)), *((uint8_t*)(testtreepointer(2)+1)));
-	kprintf("\n%d", *((uint8_t*)testtreepointer(3)));
-	kprintf("\n%d", *((uint8_t*)testtreepointer(4)));
+	kprintf("%b %b", *((uint8_t*)testtreepointer(0)), *((uint8_t*)(testtreepointer(0)+1)));
+	kprintf("\n%b %b", *((uint8_t*)testtreepointer(1)), *((uint8_t*)(testtreepointer(1)+1)));
+	kprintf("\n%b %b", *((uint8_t*)testtreepointer(2)), *((uint8_t*)(testtreepointer(2)+1)));
+	kprintf("\n%b", *((uint8_t*)testtreepointer(3)));
+	kprintf("\n%b", *((uint8_t*)testtreepointer(4)));
 
-	kfree(ptr);
-	kfree(ptr2);
-	kfree(ptr3);
+	kprintf("\n\n%d", (int) ptr2);
+	ptr2 = krealloc(ptr2, 800);
+	kprintf("\n%d", (int) ptr2);
+
+
 	kprintf("\n\n");
-	kprintf("%d %d", *((uint8_t*)testtreepointer(0)), *((uint8_t*)(testtreepointer(0)+1)));
-	kprintf("\n%d %d", *((uint8_t*)testtreepointer(1)), *((uint8_t*)(testtreepointer(1)+1)));
-	kprintf("\n%d %d", *((uint8_t*)testtreepointer(2)), *((uint8_t*)(testtreepointer(2)+1)));
-	kprintf("\n%d", *((uint8_t*)testtreepointer(3)));
-	kprintf("\n%d", *((uint8_t*)testtreepointer(4)));
+	kprintf("%b %b", *((uint8_t*)testtreepointer(0)), *((uint8_t*)(testtreepointer(0)+1)));
+	kprintf("\n%b %b", *((uint8_t*)testtreepointer(1)), *((uint8_t*)(testtreepointer(1)+1)));
+	kprintf("\n%b %b", *((uint8_t*)testtreepointer(2)), *((uint8_t*)(testtreepointer(2)+1)));
+	kprintf("\n%b", *((uint8_t*)testtreepointer(3)));
+	kprintf("\n%b", *((uint8_t*)testtreepointer(4)));
 
 	while (true) {
 		__asm("hlt");
