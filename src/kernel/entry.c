@@ -33,7 +33,7 @@ void start() {
 	int_lock(0x20);
 	__asm("int $0x80");
 	__asm("int $0x80");
-	__asm("int $0x80");
+	//__asm("int $0x80");
 	int_wait();
 
 	kprintf("Halting!\n");

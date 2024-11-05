@@ -50,10 +50,10 @@ extern void pic_remap(uint8_t offset);
 extern uint16_t pic_isr();
 
 /**
- * @brief Translates the interrupt number into the coresponding IRQ
+ * @brief Translates the interrupt number into the corresponding IRQ
  *        bitmask, or 0 if the given number is not a IRQ interrupt.
  *
- * @param[in] interrupt The interrupt number to converrt into IRQ bitmask.
+ * @param[in] interrupt The interrupt number to convert into IRQ bitmask.
  *
  * @return 8 bit IRQ bitmask, or 0 on error.
  */

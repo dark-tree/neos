@@ -16,16 +16,20 @@ extern pic_accept
 ; See interrupt.c
 extern int_common_handle
 
+global isr_name
 global isr_register
 global isr_init
 
-%macro define_isr 2
+%macro define_isr 3
 	push dword 1
 	push isr_head%1
 	push %1
 	call isr_wrap
 	add esp, 12
+	mov dword [name_table + %1 * 4], isr_name%1
 	jmp %%define_isr%1_skip
+
+	isr_name%1: db %3, 0
 
 	isr_head%1:
 		%if %2 = 0
@@ -160,6 +164,11 @@ isr_tail:
 
 	iret
 
+isr_name:
+	mov eax, [esp+4] ; Interrupt number
+	mov eax, [name_table + eax * 4]
+	ret
+
 isr_register:
 	mov edx, [esp+8] ; Function pointer
 	mov eax, [esp+4] ; Interrupt number
@@ -203,64 +212,64 @@ isr_init:
 	; This is technically not allowed by CDECL but we will do it here anyway
 	push dword [esp+8]
 
-	;            int, hec
-	define_isr  0x00,   0 ; Divide by 0
-	define_isr  0x01,   0 ; Reserved
-	define_isr  0x02,   0 ; NMI Interrupt
-	define_isr  0x03,   0 ; Breakpoint (INT3)
-	define_isr  0x04,   0 ; Overflow (INTO)
-	define_isr  0x05,   0 ; Bounds range exceeded (BOUND)
-	define_isr  0x06,   0 ; Invalid opcode (UD2)
-	define_isr  0x07,   0 ; Device not available (WAIT/FWAIT)
-	define_isr  0x08,   1 ; Double fault
-	define_isr  0x09,   0 ; Coprocessor segment overrun
-	define_isr  0x0A,   1 ; Invalid TSS
-	define_isr  0x0B,   1 ; Segment Not Present
-	define_isr  0x0C,   1 ; Stack-Segment Fault
-	define_isr  0x0D,   1 ; General Protection Fault
-	define_isr  0x0E,   1 ; Page Fault
-	define_isr  0x0F,   0 ; Reserved
-	define_isr  0x10,   0 ; x87 Floating-Point Exception
-	define_isr  0x11,   1 ; Alignment Check
-	define_isr  0x12,   0 ; Machine Check
-	define_isr  0x13,   0 ; SIMD Floating-Point Exception
-	define_isr  0x14,   0 ; Virtualization Exception
-	define_isr  0x15,   1 ; Control Protection Exception
-	define_isr  0x16,   0 ; Reserved
-	define_isr  0x17,   0 ; Reserved
-	define_isr  0x18,   0 ; Reserved
-	define_isr  0x19,   0 ; Reserved
-	define_isr  0x1A,   0 ; Reserved
-	define_isr  0x1B,   0 ; Reserved
-	define_isr  0x1C,   0 ; Hypervisor Injection Exception
-	define_isr  0x1D,   0 ; VMM Communication Exception
-	define_isr  0x1E,   0 ; Security Exception
-	define_isr  0x1F,   0 ; Reserved
+	;            int, e  name
+	define_isr  0x00, 0, "Division Error"
+	define_isr  0x01, 0, "Debug"
+	define_isr  0x02, 0, "Non-Maskable Interrupt"
+	define_isr  0x03, 0, "Breakpoint"
+	define_isr  0x04, 0, "Overflow"
+	define_isr  0x05, 0, "Bound Exceeded"
+	define_isr  0x06, 0, "Invalid Opcode"
+	define_isr  0x07, 0, "Device Not Available"
+	define_isr  0x08, 1, "Double Fault"
+	define_isr  0x09, 0, "Coprocessor Segment Overrun"
+	define_isr  0x0A, 1, "Invalid TSS"
+	define_isr  0x0B, 1, "Segment Not Present"
+	define_isr  0x0C, 1, "Stack-Segment Fault"
+	define_isr  0x0D, 1, "General Protection Fault"
+	define_isr  0x0E, 1, "Page Fault"
+	define_isr  0x0F, 0, "Reserved"
+	define_isr  0x10, 0, "x87 Floating-Point Exception"
+	define_isr  0x11, 1, "Alignment Check"
+	define_isr  0x12, 0, "Machine Check"
+	define_isr  0x13, 0, "SIMD Floating-Point Exception"
+	define_isr  0x14, 0, "Virtualization Exception"
+	define_isr  0x15, 1, "Control Protection Exception"
+	define_isr  0x16, 0, "Reserved"
+	define_isr  0x17, 0, "Reserved"
+	define_isr  0x18, 0, "Reserved"
+	define_isr  0x19, 0, "Reserved"
+	define_isr  0x1A, 0, "Reserved"
+	define_isr  0x1B, 0, "Reserved"
+	define_isr  0x1C, 0, "Hypervisor Injection Exception"
+	define_isr  0x1D, 0, "VMM Communication Exception"
+	define_isr  0x1E, 0, "Security Exception"
+	define_isr  0x1F, 0, "Reserved"
 
 	push 0x20
 	call pic_remap
 	add esp, 4
 
-	;            int, hec
-	define_isr  0x20,   0 ; IRQ 0:  PIT
-	define_isr  0x21,   0 ; IRQ 1:  Keyboard
-	define_isr  0x22,   0 ; IRQ 2:  8259A slave controller
-	define_isr  0x23,   0 ; IRQ 3:  COM2 / COM4
-	define_isr  0x24,   0 ; IRQ 4:  COM1 / COM3
-	define_isr  0x25,   0 ; IRQ 5:  LPT2
-	define_isr  0x26,   0 ; IRQ 6:  Floppy controller
-	define_isr  0x27,   0 ; IRQ 7:  LPT1
-	define_isr  0x28,   0 ; IRQ 8:  RTC
-	define_isr  0x29,   0 ; IRQ 9:  Unassigned
-	define_isr  0x2A,   0 ; IRQ 10: Unassigned
-	define_isr  0x2B,   0 ; IRQ 11: Unassigned
-	define_isr  0x2C,   0 ; IRQ 12: Mouse controller
-	define_isr  0x2D,   0 ; IRQ 13: Math coprocessor
-	define_isr  0x2E,   0 ; IRQ 14: Hard disk controller 1
-	define_isr  0x2F,   0 ; IRQ 15: Hard disk controller 2
+	;            int, e, name
+	define_isr  0x20, 0, "IRQ 0: Timer"
+	define_isr  0x21, 0, "IRQ 1: Keyboard"
+	define_isr  0x22, 0, "IRQ 2: Slave"
+	define_isr  0x23, 0, "IRQ 3: COM2, COM4"
+	define_isr  0x24, 0, "IRQ 4: COM1, COM3"
+	define_isr  0x25, 0, "IRQ 5: LPT2"
+	define_isr  0x26, 0, "IRQ 6: Floppy controller"
+	define_isr  0x27, 0, "IRQ 7: LPT1"
+	define_isr  0x28, 0, "IRQ 8: Clock"
+	define_isr  0x29, 0, "IRQ 9: ACPI"
+	define_isr  0x2A, 0, "IRQ 10: Unassigned"
+	define_isr  0x2B, 0, "IRQ 11: Unassigned"
+	define_isr  0x2C, 0, "IRQ 12: Mouse"
+	define_isr  0x2D, 0, "IRQ 13: Coprocessor"
+	define_isr  0x2E, 0, "IRQ 14: Primary ATA"
+	define_isr  0x2F, 0, "IRQ 15: Secondary ATA"
 
-	;            int, hec
-	define_isr  0x80,   0 ; Linux Syscall
+	;            int, e, name
+	define_isr  0x80, 0, "Linux Syscall"
 
 	mov esp, ebp
 	pop ebp
@@ -270,4 +279,7 @@ isr_init:
 section .data
 
 service_table:
+	times 256 dd 0
+
+name_table:
 	times 256 dd 0

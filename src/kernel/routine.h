@@ -25,3 +25,13 @@ extern void isr_init(void* offset);
  * @return None.
  */
 extern void isr_register(int interrupt, interrupt_hander handler);
+
+/**
+ * @brief Translates the interrupt number into a pointer to a human-readable
+ *        string pointer.
+ *
+ * @param[in] interrupt Interrupt number to get the name of.
+ *
+ * @return String pointer or 0 if no name was found.
+ */
+extern const char* isr_name(int interrupt);
