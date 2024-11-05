@@ -15,7 +15,8 @@ KERNEL_CC = \
 	build/kernel/memory.o \
 	build/kernel/math.o \
 	build/kernel/io.o \
-	build/kernel/floppy.o
+	build/kernel/floppy.o \
+	build/kernel/fat.o
 
 # Configuration
 CC_FLAGS = -nostdinc -fomit-frame-pointer -fno-builtin -nodefaultlibs -nostdlib -ffreestanding
@@ -24,7 +25,7 @@ CC = gcc -m32 -fno-pie -std=gnu99 -Wall -Wextra $(CC_FLAGS) -O2 -c
 AS = nasm -f elf32
 OC = objcopy -O binary
 
-.PHONY : clean all run debug
+.PHONY : clean image all run debug
 
 # Create the build directory
 build:
@@ -71,8 +72,12 @@ build/final.iso: build build/floppy.img
 	genisoimage -quiet -V 'neos' -input-charset iso8859-1 -o build/final.iso -b floppy.img -hide floppy.img iso/
 	rm -rf ./iso
 
+# Generate the floppy disk image with FAT filesystem
+image:
+	$(MAKE) makefile -C ./disks image 
+
 # Build all
-all: build/final.iso
+all: build/final.iso image
 
 # Remove all build elements
 clean:
@@ -85,7 +90,7 @@ run: build/final.iso
 # Invoke QEMU and wait for GDB
 debug: build/final.iso
 	qemu-system-i386 -cdrom ./build/final.iso -boot a -s -S -drive file=./disks/floppy.img,if=floppy,index=1,format=raw &
-	gdb -ex 'target remote localhost:1234' -ex 'break *0x7c00' -ex 'break *0x8000' -ex 'c'
+	gdb -ex 'target remote localhost:1234' -ex 'break *0x7c00' -ex 'c'
 
 disasm: build/bootloader.bin
 	ndisasm -b 16 -o 7c00h ./build/bootloader.bin

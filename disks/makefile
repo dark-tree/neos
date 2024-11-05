@@ -11,7 +11,7 @@ image:
 build:
 	@echo "Building..."
 	if [ ! -d "viewer/build" ]; then mkdir viewer/build; fi
-	gcc viewer/main.c -I../src/kernel -o viewer/build/main
+	gcc viewer/main.c ../src/kernel/fat.c -I../src/kernel -o viewer/build/main
 
 clean:
 	@echo "Cleaning up..."

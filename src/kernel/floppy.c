@@ -193,7 +193,7 @@ static bool floppy_read_sector(uint8_t head, uint8_t cylinder, uint8_t sector, u
         return false;
     }
 
-    // read sector
+    // issue read command
     floppy_send_command(READ_DATA | MFM_BIT | SK_BIT); // MT_BIT
     floppy_send_command(head << 2 | DRIVE1);
     floppy_send_command(cylinder);
@@ -209,7 +209,7 @@ static bool floppy_read_sector(uint8_t head, uint8_t cylinder, uint8_t sector, u
         return false;
     }
 
-    // read data
+    // read incoming data
     uint32_t i = 0;
     while (true){
         if (!floppy_wait_msr(0x1, RQM | DIO | NDMA, RQM | NDMA | DIO) || i > 512){
@@ -232,6 +232,7 @@ static bool floppy_read_sector(uint8_t head, uint8_t cylinder, uint8_t sector, u
         return false;
     }
 
+    // read command result
     uint8_t st0 = inb(DATA_FIFO);
     uint8_t st1 = inb(DATA_FIFO);
     uint8_t st2 = inb(DATA_FIFO);
@@ -329,6 +330,7 @@ bool floppy_read(void* buffer, uint32_t address, uint32_t size){
 
     uint32_t start_lba = address / 512;
     uint32_t end_lba = (address + size) / 512;
+    uint32_t output_buffer_index = 0;
 
     for (uint32_t lba = start_lba; lba <= end_lba; lba++){
         if (!floppy_read_lba(lba, tmp_buffer)){
@@ -345,11 +347,27 @@ bool floppy_read(void* buffer, uint32_t address, uint32_t size){
         }
 
         for (uint32_t i = start; i < end; i++){
-            ((uint8_t*)buffer)[i + (lba - start_lba) * 512] = tmp_buffer[i];
+            ((uint8_t*)buffer)[output_buffer_index++] = tmp_buffer[i];
         }
     }
 
     return true;
 }
 
-// 13:00
+void print_buffer(const unsigned char* buffer, int size) {
+	for (int i = 0; i < size; i++) {
+		kprintf("%x ", buffer[i]);
+		if ((i + 1) % 16 == 0 || i == size - 1) {
+			kprintf("    ");
+			for (int j = i - i % 16; j <= i; j++) {
+				if (buffer[j] >= 32 && buffer[j] <= 126) {
+					kprintf("%c", buffer[j]);
+				}
+				else {
+					kprintf(".");
+				}
+			}
+			kprintf("\n");
+		}
+	}
+}

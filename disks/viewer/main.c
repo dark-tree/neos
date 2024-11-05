@@ -2,13 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define FAT32_DEBUG
-#define FAT32_PRINT
-#include "fat32.h"
+#define fat_DEBUG
+#include "fat.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
-void interactive_file_explorer(fat32_DISK* disk) {
+void interactive_file_explorer(fat_DISK* disk) {
 	printf("---===### FAT Explorer 2000 ###===---\n");
 	printf("Commands:\n");
 	printf("  ls               list files in current directory\n");
@@ -17,19 +16,19 @@ void interactive_file_explorer(fat32_DISK* disk) {
 	printf("  save <file>      save file to disk\n");
 	printf("  exit             exit the program\n");
 
-	fat32_DIR current_dir;
+	fat_DIR current_dir;
 
-	fat32_DIR tmp_dir;
-	fat32_FILE tmp_file;
+	fat_DIR tmp_dir;
+	fat_FILE tmp_file;
 
 	int type;
 	char command[256];
 
-	fat32_copy_DIR(&current_dir, &disk->root_directory);
+	fat_copy_DIR(&current_dir, &disk->root_directory);
 
 	while (1) {
 		
-		print_longname(current_dir.long_filename);
+		fat_print_longname(current_dir.long_filename);
 		printf("> ");
 		fgets(command, 256, stdin);
 		command[strlen(command) - 1] = '\0';
@@ -39,14 +38,14 @@ void interactive_file_explorer(fat32_DISK* disk) {
 		} 
 		else {
 			if (strncmp(command, "ls", 2) == 0) {
-				fat32_rewinddir(&current_dir);
-				while (type = fat32_readdir(&tmp_dir, &tmp_file, &current_dir)) {
-					if (type == fat32_FOUND_FILE) {
-						print_longname(tmp_file.long_filename);
+				fat_rewinddir(&current_dir);
+				while (type = fat_readdir(&tmp_dir, &tmp_file, &current_dir)) {
+					if (type == fat_FOUND_FILE) {
+						fat_print_longname(tmp_file.long_filename);
 						printf("\n");
 					}
-					else if (type == fat32_FOUND_DIR) {
-						print_longname(tmp_dir.long_filename);
+					else if (type == fat_FOUND_DIR) {
+						fat_print_longname(tmp_dir.long_filename);
 						printf("/\n");
 					}
 				}
@@ -57,8 +56,8 @@ void interactive_file_explorer(fat32_DISK* disk) {
 				if (path[strlen(path) - 1] == '/') {
 					path[strlen(path) - 1] = '\0';
 				}
-				if (fat32_opendir(&tmp_dir, &current_dir, path)) {
-					fat32_copy_DIR(&current_dir, &tmp_dir);
+				if (fat_opendir(&tmp_dir, &current_dir, path)) {
+					fat_copy_DIR(&current_dir, &tmp_dir);
 				}
 				else {
 					printf("Error: Could not open directory\n");
@@ -67,13 +66,13 @@ void interactive_file_explorer(fat32_DISK* disk) {
 			}
 			else if (strncmp(command, "cat ", 4) == 0) {
 				char* path = command + 4;
-				if (fat32_fopen(&tmp_file, &current_dir, path)) {
-					fat32_fseek(&tmp_file, 0, fat32_SEEK_END);
-					unsigned int size = fat32_ftell(&tmp_file);
-					fat32_fseek(&tmp_file, 0, fat32_SEEK_SET);
+				if (fat_fopen(&tmp_file, &current_dir, path)) {
+					fat_fseek(&tmp_file, 0, fat_SEEK_END);
+					unsigned int size = fat_ftell(&tmp_file);
+					fat_fseek(&tmp_file, 0, fat_SEEK_SET);
 
 					char* buffer = (char*)malloc(size + 1);
-					fat32_fread(buffer, 1, size, &tmp_file);
+					fat_fread(buffer, 1, size, &tmp_file);
 					buffer[size] = '\0';
 
 					printf("%s", buffer);
@@ -86,9 +85,9 @@ void interactive_file_explorer(fat32_DISK* disk) {
 			}
 			else if (strncmp(command, "save ", 5) == 0) {
 				char* path = command + 5;
-				if (fat32_fopen(&tmp_file, &current_dir, path)) {
+				if (fat_fopen(&tmp_file, &current_dir, path)) {
 					char buffer[256];
-					longname_to_string(tmp_file.long_filename, buffer);
+					fat_longname_to_string(tmp_file.long_filename, buffer);
 
 					char save_path[256];
 					realpath(buffer, save_path);
@@ -99,12 +98,12 @@ void interactive_file_explorer(fat32_DISK* disk) {
 						printf("Error: Could not open save file\n");
 					}
 					else {
-						fat32_fseek(&tmp_file, 0, fat32_SEEK_END);
-						unsigned int size = fat32_ftell(&tmp_file);
-						fat32_fseek(&tmp_file, 0, fat32_SEEK_SET);
+						fat_fseek(&tmp_file, 0, fat_SEEK_END);
+						unsigned int size = fat_ftell(&tmp_file);
+						fat_fseek(&tmp_file, 0, fat_SEEK_SET);
 
 						char* buffer = (char*)malloc(size);
-						fat32_fread(buffer, 1, size, &tmp_file);
+						fat_fread(buffer, 1, size, &tmp_file);
 
 						// limit max file size to 256MB
 						size = min(size, 0xfffffff);
@@ -135,14 +134,16 @@ void disk_read_func(unsigned char* data_out, unsigned int offset_in, unsigned in
 int main() {
 	const char* image_file = "floppy.img";
 
+	// open the image file
 	FILE* file = fopen(image_file, "rb");
 	if (file == NULL) {
 		printf("Error: Could not open file %s\n", image_file);
 		return 1;
 	}
 
-	fat32_DISK disk;
-	if(!fat32_init(&disk, disk_read_func, file)) {
+	// create FAT disk with attached disk image access method
+	fat_DISK disk;
+	if(!fat_init(&disk, disk_read_func, file)) {
 		return 1;
 	}
 
