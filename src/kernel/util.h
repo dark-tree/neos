@@ -6,4 +6,4 @@
  *
  * @return None.
  */
-void halt();
+extern void halt();

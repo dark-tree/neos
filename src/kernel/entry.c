@@ -29,7 +29,7 @@ void start() {
 	kprintf("System ready!\n");
 
 	__asm("int $0x80");
-	__asm("int $0x00");
+	__asm("int $0x80");
 
 	// never return to the bootloader
 	halt();

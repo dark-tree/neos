@@ -7,6 +7,12 @@ section .text
 ; See tables.h
 extern gdtr_switch
 
+; See pic.h
+extern pic_remap
+extern pic_isr
+extern pic_irq
+extern pic_accept
+
 global isr_register
 global isr_init
 
@@ -19,7 +25,6 @@ global isr_init
 	jmp %%define_isr%1_skip
 
 	isr_head%1:
-		cli
 		%if %2 = 0
 			push dword 0
 		%endif
@@ -54,36 +59,85 @@ isr_tail:
 	add esp, 8
 
 	; Interrupt error code
-	mov eax, [esp+44]
+	mov edx, [esp+44]
 
 	; Interrupt number
-	mov ebx, [esp+40]
+	mov eax, [esp+40]
 
-	; Load handler pointer
-	mov ecx, [service_table + ebx * 4]
+	; Load CDECL handler pointer, we use preserved register here
+	mov esi, [service_table + eax * 4]
+
+	; Those will become the handler call arguments
+	push edx
+	push eax
+
+	; Convert interrupt number to IRQ bitmask (result in EAX)
+	; Uses the same stack element (last push) that will be later used during CDECL call so we don't pop
+	call pic_irq
+
+	; EAX now contains the IRQ bitmask
+	test eax, eax
+	jz isr_tail_not_irq
+
+		; Save eax, as we will need it later
+		; We will restore it to a diffrent register
+		push eax
+
+		; This takes no args
+		; EAX will contain the PIC's ISR
+		call pic_isr
+
+		; We now have the ISR mask in EAX
+		; and the IRQ mask in EBX (we use this register as it will be preserved after the C call)
+		pop ebx
+
+		; Check if IRQ mask and ISR match
+		; there should be a single shared bit for all valid IRQs
+		and ebx, eax
+		pushf
+
+		; If some bit was set in high 8 bits, set any bit (we set the correct IRQ2 bit) in the low 8 bits
+		; This will be used to determine to which PIC should the EOI command be send after the handler
+		test bh, bh
+		jz isr_tail_no_low_bit
+
+			or bx, 0x02
+
+		isr_tail_no_low_bit:
+
+		; Return to the result of the AND, if there were no bits in common this was
+		; a spurious interrupt so we will skip the handler
+		popf
+		jz isr_tail_no_handle
+
+	isr_tail_not_irq:
 
 	; Call kernel handler procedure
-	test ecx, ecx
+	test esi, esi
 	jz isr_tail_no_handle
-		push eax
-		push ebx
-		call ecx
-		add esp, 8
+
+		; This alignes with EDX/EAX pair pushed earlier
+		call esi
 
 	isr_tail_no_handle:
+
+	; Arguments were pushed before so we always pop them here
+	add esp, 8
 
 	; This alignes with the saved segments from before
 	call gdtr_switch
 	add esp, 8
 
+	push ebx
+	call pic_accept
+	add esp, 4
+
 	; Pop everything back
 	popa
 
-	; Pop ISR number and error code
+	; Pop ISR number and error code (pushed in head)
 	add esp, 8
 
-	; We need to renable interupts
-	sti
 	iret
 
 isr_register:
@@ -162,15 +216,31 @@ isr_init:
 	define_isr  0x1D,   0 ; VMM Communication Exception
 	define_isr  0x1E,   0 ; Security Exception
 	define_isr  0x1F,   0 ; Reserved
-	define_isr  0x70,   0 ; IRQ 8:  RTC
-	define_isr  0x71,   0 ; IRQ 9:  Unassigned
-	define_isr  0x72,   0 ; IRQ 10: Unassigned
-	define_isr  0x73,   0 ; IRQ 11: Unassigned
-	define_isr  0x74,   0 ; IRQ 12: Mouse controller
-	define_isr  0x75,   0 ; IRQ 13: Math coprocessor
-	define_isr  0x76,   0 ; IRQ 14: Hard disk controller 1
-	define_isr  0x77,   0 ; IRQ 15: Hard disk controller 2
-	define_isr  0x80,   0 ; Syscall
+
+	push 0x20
+	call pic_remap
+	add esp, 4
+
+	;            int, hec
+	define_isr  0x20,   0 ; IRQ 0:  PIT
+	define_isr  0x21,   0 ; IRQ 1:  Keyboard
+	define_isr  0x22,   0 ; IRQ 2:  8259A slave controller
+	define_isr  0x23,   0 ; IRQ 3:  COM2 / COM4
+	define_isr  0x24,   0 ; IRQ 4:  COM1 / COM3
+	define_isr  0x25,   0 ; IRQ 5:  LPT2
+	define_isr  0x26,   0 ; IRQ 6:  Floppy controller
+	define_isr  0x27,   0 ; IRQ 7:  LPT1
+	define_isr  0x28,   0 ; IRQ 8:  RTC
+	define_isr  0x29,   0 ; IRQ 9:  Unassigned
+	define_isr  0x2A,   0 ; IRQ 10: Unassigned
+	define_isr  0x2B,   0 ; IRQ 11: Unassigned
+	define_isr  0x2C,   0 ; IRQ 12: Mouse controller
+	define_isr  0x2D,   0 ; IRQ 13: Math coprocessor
+	define_isr  0x2E,   0 ; IRQ 14: Hard disk controller 1
+	define_isr  0x2F,   0 ; IRQ 15: Hard disk controller 2
+
+	;            int, hec
+	define_isr  0x80,   0 ; Linux Syscall
 
 	mov esp, ebp
 	pop ebp

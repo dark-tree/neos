@@ -5,10 +5,11 @@
 #include "tables.h"
 #include "routine.h"
 #include "util.h"
+#include "pic.h"
 
 void test_int(int number, int error) {
 	kprintf("Interupt: 0x%x, err=%d\n", number, error);
-	halt();
+	//halt();
 }
 
 void idt_init() {
@@ -20,7 +21,12 @@ void idt_init() {
 		isr_register(i, test_int);
 	}
 
+	//pic_disable();
+
 	// Point the processor at the IDT and enable interrupts
 	idtr_store(MEMORY_MAP_IDT, 0x81);
+
+	// Enable hardware interrupts
+	pic_enable();
 
 }
