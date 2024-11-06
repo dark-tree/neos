@@ -7,6 +7,10 @@ bits 32
 
 section .text
 
+extern memmove
+
+
+
 global test
 global kset
 global kmalloc
@@ -19,7 +23,6 @@ global kinternal_buddify
 global kinternal_allocate
 global kfree
 global krealloc
-
 
 
 
@@ -174,7 +177,39 @@ push EDI
 	pop ECX
 
 
+
+
 	ra_return:
+	test EAX, EAX
+	jz ra_skip_copying
+
+	push EAX
+
+	push ECX
+	mov ECX, ESI
+	mov EDX, 1
+	shl EDX, CL	;Size of the currently existing area in segments
+
+	pop ECX
+
+	mov EAX, EDX
+	xor EDX, EDX
+	mov EBX, KMALLOC_BLOCK_SIZE
+	mul EBX
+
+	mov EBX, EAX
+	pop EAX
+	push EAX
+
+	push EBX
+	mov EBX, [ECX+4]
+	push EBX
+	push EAX
+	call memmove
+	add ESP, 12
+
+	pop EAX
+	ra_skip_copying:
 pop EDI
 pop ESI
 pop EBX

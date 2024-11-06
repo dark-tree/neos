@@ -67,8 +67,13 @@ void start() {
 	kprintf("\n%b", *((uint8_t*)testtreepointer(4)));
 
 	kprintf("\n\n%d", (int) ptr2);
+
+	int* intptr = (int*)ptr2;
+	*intptr = 281;
 	ptr2 = krealloc(ptr2, 800);
+	
 	kprintf("\n%d", (int) ptr2);
+	kprintf("\n%d", *((int*)ptr2));
 
 
 	kprintf("\n\n");
