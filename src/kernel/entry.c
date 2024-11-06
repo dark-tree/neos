@@ -70,7 +70,7 @@ void start() {
 
 	int* intptr = (int*)ptr2;
 	*intptr = 281;
-	ptr2 = krealloc(ptr2, 800);
+	ptr2 = krealloc(ptr2, 400);
 	
 	kprintf("\n%d", (int) ptr2);
 	kprintf("\n%d", *((int*)ptr2));

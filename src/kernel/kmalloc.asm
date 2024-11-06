@@ -84,9 +84,11 @@ push EDI
 	mov EAX, [ECX+8]
 
 	; ... and covert it to segments, and saves it in EAX
+	sub EAX, 1
 	xor EDX, EDX
 	mov EBX, KMALLOC_BLOCK_SIZE
 	div EBX
+	add EAX, 1
 
 	; Calculate greater or equal power of two
 	xor EBX, EBX
