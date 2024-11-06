@@ -47,7 +47,9 @@ void start() {
 	kmalloc(200);
 	kmalloc(200);
 	kmalloc(400);
+	void* ptr5 = kmalloc(400);
 	void* ptr2 = kmalloc(400);
+	kfree(ptr5);
 	//kmalloc(400);
 	//void* ptr = kmalloc(800);
 	//void* ptr3 = kmalloc(200);

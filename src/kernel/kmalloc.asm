@@ -133,8 +133,6 @@ push EDI
 	jnz ra_move
 
 	push ECX
-
-	;This is for the buddify call below
 	push EAX
 
 	push DWORD 0xFFFFFFFF
@@ -142,15 +140,26 @@ push EDI
 	push EBX
 	call kinternal_settreeelement
 	add ESP, 12
+	
+	pop EAX
+	push EAX
 
-	;Here EAX is already pushed, so I only push the other argument
+	push EAX
 	push EBX
 	call kinternal_full_buddify
 	add ESP, 8
 
-	pop ECX
+	pop EAX
 
-	mov EAX, [ECX+4]
+	mov ECX, EBX
+
+	shl EAX, CL
+
+	pop ECX
+	
+	mov EDX, 0
+	mov EBX, KMALLOC_BLOCK_SIZE
+	mul EBX
 
 	jmp ra_return
 	ra_move:
