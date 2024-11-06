@@ -22,3 +22,9 @@
  *        as printed by kprintf() (for any base)
  */
 #define KPRINTF_MAX_DIGITS 64
+
+/**
+ * @brief The physical address of the Interrupt Descriptor Table,
+ *        Refer to the x86 memory map when modifying this value.
+ */
+#define MEMORY_MAP_IDT 0x0

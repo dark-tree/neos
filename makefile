@@ -5,7 +5,11 @@ $(foreach bin,$(REQUIRED_BINS), $(if $(shell command -v $(bin) 2> /dev/null),$(t
 
 # Kernel assembly object files
 KERNEL_AS = \
-	build/kernel/kmalloc.o
+	build/kernel/kmalloc.o \
+	build/kernel/tables.o \
+	build/kernel/routine.o \
+	build/kernel/pic.o \
+	build/kernel/util.o
 
 # Kernel C object files
 KERNEL_CC = \
@@ -13,7 +17,9 @@ KERNEL_CC = \
 	build/kernel/console.o \
 	build/kernel/print.o \
 	build/kernel/memory.o \
-	build/kernel/math.o
+	build/kernel/math.o \
+	build/kernel/interrupt.o \
+	build/kernel/syscall.o
 
 # Configuration
 CC_FLAGS = -nostdinc -fomit-frame-pointer -fno-builtin -nodefaultlibs -nostdlib -ffreestanding
@@ -78,7 +84,8 @@ clean:
 
 # Invoke QEMU wihtout waiting for GDB
 run: build/final.iso
-	qemu-system-i386 -monitor stdio -cdrom ./build/final.iso -boot a
+	rm -f ./output
+	qemu-system-i386 -monitor stdio -cdrom ./build/final.iso -boot a -d cpu_reset -D ./output
 
 # Invoke QEMU and wait for GDB
 debug: build/final.iso

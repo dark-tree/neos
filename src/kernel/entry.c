@@ -2,8 +2,11 @@
 #include "types.h"
 #include "console.h"
 #include "print.h"
+#include "interrupt.h"
+#include "util.h"
 
-extern char test();
+extern char asm_test();
+extern void pic_disable();
 
 #define X "\xDB"
 #define S " "
@@ -21,7 +24,14 @@ void start() {
 	kprintf("\e[29C" X S S S X S X X X X S S X X X S S X X X X"\n");
 	kprintf("\e[29C" " Linux Compatible OS\n");
 
-	while (true) {
-		__asm("hlt");
-	}
+	pic_disable();
+	int_init();
+
+	kprintf("System ready!\n");
+
+	asm_test();
+
+	// never return to the bootloader
+	halt();
+
 }
