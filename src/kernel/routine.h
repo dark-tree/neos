@@ -1,9 +1,11 @@
 #pragma once
 
 /**
- * @brief Signature of the function that will be invoked by the Interrupt Service Routine
+ * @brief Signature of the function that will be invoked by the Interrupt Service Routine.
+ *        The values of the registers as they were when the interrupt was triggered are passed this function
+ *        unchanged. The first register (EAX) is passed by pointer and can be used in the handler to return a value to the invoker.
  */
-typedef void (*interrupt_hander) (int number, int error, int eax, int ecx, int edx, int ebx, int esi, int edi);
+typedef void (*interrupt_hander) (int number, int error, int* eax, int ecx, int edx, int ebx, int esi, int edi);
 
 /**
  * @brief Initializes the contents of the Interrupt Descriptor Table

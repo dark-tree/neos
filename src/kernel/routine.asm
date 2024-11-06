@@ -86,7 +86,10 @@ isr_tail:
 	push dword [ebp + 4 * 4] ; EBX
 	push dword [ebp + 4 * 5] ; EDX
 	push dword [ebp + 4 * 6] ; ECX
-	push dword [ebp + 4 * 7] ; EAX
+
+	; This will move EBP but it's fine, we won't need it anymore
+	add ebp, 4 * 7
+	push dword ebp           ; EAX*
 
 	push edx
 	push eax

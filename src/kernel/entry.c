@@ -5,7 +5,7 @@
 #include "interrupt.h"
 #include "util.h"
 
-extern char test();
+extern char asm_test();
 extern void pic_disable();
 
 #define X "\xDB"
@@ -29,14 +29,7 @@ void start() {
 
 	kprintf("System ready!\n");
 
-	// wait for one timer pulse (just a simple interrupt test)
-	int_lock(0x20);
-	__asm("int $0x80");
-	__asm("int $0x80");
-	//__asm("int $0x80");
-	int_wait();
-
-	kprintf("Halting!\n");
+	asm_test();
 
 	// never return to the bootloader
 	halt();
