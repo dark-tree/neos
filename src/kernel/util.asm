@@ -14,6 +14,10 @@ halt:
 	jmp halt
 
 asm_test:
+
+	int 0x01
+	call halt
+
 	push hello
 	call strlen
 	add esp, 4

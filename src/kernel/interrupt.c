@@ -57,6 +57,13 @@ void int_wait() {
 	}
 }
 
+extern int_go_bonkers();
+
+void int_gone_bonkers() {
+	kprintf("Gone %s!\n", "Bonkers");
+	halt();
+}
+
 void int_init() {
 
 	// init the wait subsystem
@@ -72,6 +79,7 @@ void int_init() {
 	}
 
 	isr_register(0x20, NULL);             // stop the timer spam
+	isr_register(0x01, int_go_bonkers);   // the forbidden interrupt:tm:
 	isr_register(0x80, int_linux_handle); // forward syscalls to the syscall system
 
 	// Point the processor at the IDT and enable interrupts
