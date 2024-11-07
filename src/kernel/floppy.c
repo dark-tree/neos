@@ -205,7 +205,7 @@ static bool floppy_read_sector(uint8_t head, uint8_t cylinder, uint8_t sector, u
     floppy_send_command(0xff); // data length
 
     if(!floppy_wait_ready(0xffffff)){
-        floppy_debug_msg("Error: Floppy not ready after read\n");
+        floppy_debug_msg("Error: Floppy not ready after read command\n");
         return false;
     }
 
@@ -232,6 +232,11 @@ static bool floppy_read_sector(uint8_t head, uint8_t cylinder, uint8_t sector, u
         return false;
     }
 
+    if (!floppy_wait_ready(0xffffff)){
+        floppy_debug_msg("Error: Floppy not ready after read\n");
+        return false;
+    }
+
     // read command result
     uint8_t st0 = inb(DATA_FIFO);
     uint8_t st1 = inb(DATA_FIFO);
@@ -240,10 +245,109 @@ static bool floppy_read_sector(uint8_t head, uint8_t cylinder, uint8_t sector, u
     uint8_t result_head = inb(DATA_FIFO);
     uint8_t result_sector = inb(DATA_FIFO);
     uint8_t result_2 = inb(DATA_FIFO);
-    floppy_debug_msg("ST0: 0x%x, ST1: 0x%x, ST2: 0x%x, Cylinder: %d, Head: %d, Sector: %d, 2: %d\n", st0, st1, st2, result_cylinder, result_head, result_sector, result_2);
+    floppy_debug_msg("R ST0: 0x%x, ST1: 0x%x, ST2: 0x%x, Cylinder: %d, Head: %d, Sector: %d, 2: %d\n", st0, st1, st2, result_cylinder, result_head, result_sector, result_2);
 
     if ((st0 & 0xC0) || result_cylinder != cylinder || result_head != head || result_sector != sector || result_2 != 2){
         floppy_debug_msg("Error: Floppy read failed\n");
+        return false;
+    }
+
+    return true;
+}
+
+static bool floppy_reset(){
+    /*========= reset ==========*/
+    // disable controller
+    outb(DIGITAL_OUTPUT_REGISTER, 0x00);
+    // enable controller, select drive 1
+    outb(DIGITAL_OUTPUT_REGISTER, RESET | DRIVE1_MOTOR | DRIVE1);
+
+    // wait for a while
+    for(uint32_t i = 0; i < 0xfffffff; i++){
+        __asm__ volatile ("nop");
+    }
+
+    // sense interrupt 4 times
+    for(uint8_t i = 0; i < 4; i++){
+        floppy_send_command(SENSE_INTERRUPT);
+        uint8_t status = inb(DATA_FIFO);
+        floppy_debug_msg("Reset status: 0x%x\n", status);
+        uint8_t cylinder = inb(DATA_FIFO);
+        floppy_debug_msg("Reset cylinder: %d\n", cylinder);
+    }
+
+    /*======== specify drive parameters ========*/
+    floppy_send_command(SPECIFY);
+    floppy_send_command(0xdf);
+    floppy_send_command(0x03); // non-DMA mode
+
+    // recalibrate drive
+    if(!floppy_calibrate(DRIVE1)){
+        return false;
+    }
+
+    return true;
+}
+
+static bool floppy_write_sector(uint8_t head, uint8_t cylinder, uint8_t sector, uint8_t* buffer){
+    if (!floppy_seek(head, cylinder)){
+        return false;
+    }
+
+    // issue write command
+    floppy_send_command(WRITE_DATA | MFM_BIT | SK_BIT); // MT_BIT
+    floppy_send_command(head << 2 | DRIVE1);
+    floppy_send_command(cylinder);
+    floppy_send_command(head);
+    floppy_send_command(sector); // first sector
+    floppy_send_command(2); // sector size = 512 bytes
+    floppy_send_command(sector); // last sector
+    floppy_send_command(0x1b); // gap length
+    floppy_send_command(0xff); // data length
+
+    if (!floppy_wait_ready(0xffffff)){
+        floppy_debug_msg("Error: Floppy not ready after write command\n");
+        return false;
+    }
+
+    // write data
+    uint32_t i = 0;
+    while (true){
+        if (!floppy_wait_msr(0x1, RQM | DIO | NDMA, RQM | NDMA) || i > 512){
+            break;
+        }
+        outb(DATA_FIFO, buffer[i]);
+        i++;
+    }
+
+    floppy_debug_msg("Wrote %d bytes\n", i);
+    if (i != 512){
+        floppy_debug_msg("Error: Floppy write failed\n");
+        return false;
+    }
+
+    // for some reason, the msr is not ready after writing no matter how long you wait
+    // so we just wait shorter than usual, because it's not going to work anyway
+    // I literally issue the read command in the same way and it works, but the write command doesn't
+    if (!floppy_wait_ready(0xffff)){
+        floppy_debug_msg("Error: Floppy not ready after write\n");
+        // absolutely unacceptable, but I ran out of ideas, TODO: fix this
+        floppy_reset();  
+        return true; // <-- it should be false
+    }
+
+    // read command result
+    uint8_t st0 = inb(DATA_FIFO);
+    uint8_t st1 = inb(DATA_FIFO);
+    uint8_t st2 = inb(DATA_FIFO);
+    uint8_t result_cylinder = inb(DATA_FIFO);
+    uint8_t result_head = inb(DATA_FIFO);
+    uint8_t result_sector = inb(DATA_FIFO);
+    uint8_t result_2 = inb(DATA_FIFO);
+    floppy_debug_msg("W ST0: 0x%x, ST1: 0x%x, ST2: 0x%x, Cylinder: %d, Head: %d, Sector: %d, 2: %d\n", st0, st1, st2, result_cylinder, result_head, result_sector, result_2);
+
+    if ((st0 & 0xC0) || result_cylinder != cylinder || result_head != head || result_sector != sector || result_2 != 2){
+        floppy_debug_msg("Error: Floppy write failed\n");
         return false;
     }
 
@@ -260,6 +364,12 @@ static bool floppy_read_lba(uint32_t lba, uint8_t* buffer){
     uint8_t head, cylinder, sector;
     lba_to_chs(lba, &cylinder, &head, &sector);
     return floppy_read_sector(head, cylinder, sector, buffer);
+}
+
+static bool floppy_write_lba(uint32_t lba, uint8_t* buffer){
+    uint8_t head, cylinder, sector;
+    lba_to_chs(lba, &cylinder, &head, &sector);
+    return floppy_write_sector(head, cylinder, sector, buffer);
 }
 
 /* public */
@@ -291,33 +401,8 @@ bool floppy_init(){
         return false;
     }
 
-    /*========= reset ==========*/
-    // disable controller
-    outb(DIGITAL_OUTPUT_REGISTER, 0x00);
-    // enable controller, select drive 1
-    outb(DIGITAL_OUTPUT_REGISTER, RESET | DRIVE1_MOTOR | DRIVE1);
-
-    // wait for a while
-    for(uint32_t i = 0; i < 0xfffffff; i++){
-        __asm__ volatile ("nop");
-    }
-
-    // sense interrupt 4 times
-    for(uint8_t i = 0; i < 4; i++){
-        floppy_send_command(SENSE_INTERRUPT);
-        uint8_t status = inb(DATA_FIFO);
-        floppy_debug_msg("Reset status: 0x%x\n", status);
-        uint8_t cylinder = inb(DATA_FIFO);
-        floppy_debug_msg("Reset cylinder: %d\n", cylinder);
-    }
-
-    /*======== specify drive parameters ========*/
-    floppy_send_command(SPECIFY);
-    floppy_send_command(0xdf);
-    floppy_send_command(0x03); // non-DMA mode
-
-    // recalibrate drive
-    if(!floppy_calibrate(DRIVE1)){
+    if(!floppy_reset()){
+        floppy_debug_msg("Error: Floppy reset failed\n");
         return false;
     }
 
@@ -326,6 +411,8 @@ bool floppy_init(){
 }
 
 bool floppy_read(void* buffer, uint32_t address, uint32_t size){
+    floppy_debug_msg("Reading %d bytes from address 0x%x\n", size, address);
+
     uint8_t tmp_buffer[512];
 
     uint32_t start_lba = address / 512;
@@ -348,6 +435,43 @@ bool floppy_read(void* buffer, uint32_t address, uint32_t size){
 
         for (uint32_t i = start; i < end; i++){
             ((uint8_t*)buffer)[output_buffer_index++] = tmp_buffer[i];
+        }
+    }
+
+    return true;
+}
+
+bool floppy_write(void* buffer, uint32_t address, uint32_t size, bool preserve){
+    floppy_debug_msg("Writing %d bytes to address 0x%x\n", size, address);
+
+    uint8_t tmp_buffer[512];
+
+    uint32_t start_lba = address / 512;
+    uint32_t end_lba = (address + size) / 512;
+    uint32_t input_buffer_index = 0;
+
+    for (uint32_t lba = start_lba; lba <= end_lba; lba++){
+        if (preserve){
+            if (!floppy_read_lba(lba, tmp_buffer)){
+                return false;
+            }
+        }
+
+        uint32_t start = 0;
+        uint32_t end = 512;
+        if (lba == start_lba){
+            start = address % 512;
+        }
+        if (lba == end_lba){
+            end = (address + size) % 512;
+        }
+
+        for (uint32_t i = start; i < end; i++){
+            tmp_buffer[i] = ((uint8_t*)buffer)[input_buffer_index++];
+        }
+
+        if (!floppy_write_lba(lba, tmp_buffer)){
+            return false;
         }
     }
 

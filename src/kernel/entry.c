@@ -24,6 +24,12 @@ void start() {
 
 			fat_FILE file;
 			if(fat_fopen(&file, &current_dir, "files/readme.txt")){
+				char write_buffer[] = "Hello, World!";
+				if(!floppy_write(write_buffer, 0x9c00, sizeof(write_buffer), true)){
+					kprintf("Error: Failed to write to file\n");
+					goto done;
+				}
+
 				fat_fseek(&file, 0, fat_SEEK_END);
 				unsigned int size = fat_ftell(&file);
 				fat_fseek(&file, 0, fat_SEEK_SET);
@@ -37,6 +43,7 @@ void start() {
 			else{
 				kprintf("Error: Failed to open file\n");
 			}
+
 		}
 		else{
 			kprintf("Error: Failed to initialize FAT32 disk\n");
@@ -46,6 +53,7 @@ void start() {
 		kprintf("Error: Floppy not initialized\n");
 	}
 
+	done:
 	kprintf("Done\n");
 
 	while (true) {
