@@ -4,7 +4,10 @@
  * @brief Writes the C string pointed by `pattern` to the standard output
  *        If `pattern` includes format specifiers (subsequences beginning with %),
  *        the additional arguments following the `pattern` are formatted and inserted in
- *        the resulting string replacing their respective specifiers.
+ *        the resulting string replacing their respective specifier sequence.
+ *
+ *        Specifier sequence is defined as follows:
+ *        %[modifier...]specifier
  *
  *        Specifier | Output                     | Example
  *        --------- | -------------------------- | -------
@@ -16,7 +19,16 @@
  *        %s        | Null-terminated string     | Hello!
  *        %%        | A literal '%' character    | %
  *
- *        If  a specific specifiers sequence is not recoginez it will be
+ *        Modifier  | Effect
+ *        --------- | ------------------------------------
+ *        u         | Print the valus as unsigned integer
+ *        #         | Prepend value with 0o, 0b, or 0x
+ *        (space)   | If sign is isn't written output a space
+ *        +         | Show the plus sign for positive numbers
+ *        0         | Pad with zeros, in place of spaces
+ *        .number   | The number of characters to print
+ *
+ *        If a specific specifiers sequence is not recognized it will be
  *        ignored and skipped, without producing any output.
  *
  * @param[in] pattern C string that contains the text to be written, with optional embedded format specifiers.
