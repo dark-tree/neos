@@ -98,6 +98,18 @@ static unsigned int read_fat_entry(fat_DISK* disk, unsigned int cluster) {
 	return fat_entry;
 }
 
+static void write_fat_entry(fat_DISK* disk, unsigned int cluster, unsigned int value) {
+	unsigned int fat_offset = disk->bpb.BPB_RsvdSecCnt * disk->bpb.BPB_BytsPerSec;
+
+	// Each entry is 4 bytes long
+	unsigned int fat_entry = fat_offset + cluster * 4;
+	// Update the FAT table
+	disk->write_func((unsigned char*)&value, fat_entry, sizeof(value), disk->user_args);
+	// Update the backup FAT table
+	unsigned int fat_size = disk->bpb.BPB_FATSz32 * disk->bpb.BPB_BytsPerSec;
+	disk->write_func((unsigned char*)&value, fat_entry + fat_size, sizeof(value), disk->user_args);
+}
+
 void fat_fread(void* data_out, unsigned int element_size, unsigned int element_count, fat_FILE* file) {
 	/*
 	* In order to read the contents of a file, first we need to read the DIR_FstClusLO value from the directory entry.
@@ -145,10 +157,17 @@ void fat_fread(void* data_out, unsigned int element_size, unsigned int element_c
 		if (cluster_read_data_offset > file->cursor) {
 			unsigned int bytes_to_read = (data_size > (part_size + read_total_bytes)) ? part_size : (data_size - read_total_bytes);
 			unsigned int src_read_offset = cluster_offset * file->disk->bpb.BPB_BytsPerSec;
-			// if reading from the first cluster, we might want to skip the first bytes
-			// next clusters will always be read from the beginning
+			
 			if (cluster_read_data_offset - file->cursor <= cluster_size) {
-				src_read_offset += cluster_size - (cluster_read_data_offset - file->cursor);
+				// if reading from the first cluster, we might want to skip the first bytes
+				// next clusters will always be read from the beginning
+				unsigned int skip_bytes = cluster_size - (cluster_read_data_offset - file->cursor);
+				src_read_offset += skip_bytes;
+
+				if (bytes_to_read + skip_bytes > part_size) {
+					// If the read goes over the cluster boundary, trim the read size
+					bytes_to_read -= (bytes_to_read + skip_bytes) - part_size;
+				}
 			}
 
 			// Read the part of the cluster that is needed
@@ -175,6 +194,114 @@ void fat_fread(void* data_out, unsigned int element_size, unsigned int element_c
 	file->cursor += read_total_bytes;
 }
 
+static void fat_update_entry(fat_FILE* dir) {
+	dir->disk->write_func((unsigned char*)(&dir->fat_dir), dir->entry_position, sizeof(fat_dir_entry), dir->disk->user_args);
+}
+
+unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int element_count, fat_FILE* file) {
+	fat_dir_entry* file_dir = &file->fat_dir;
+
+	unsigned int first_fat_sector = file->disk->bpb.BPB_RsvdSecCnt;
+	unsigned int first_data_sector = first_fat_sector + (file->disk->bpb.BPB_NumFATs * file->disk->bpb.BPB_FATSz32);
+
+	unsigned int current_file_cluster = file_dir->DIR_FstClusLO;
+	unsigned int cluster_write_data_offset = 0;
+	unsigned int write_total_bytes = 0;
+
+	unsigned int cluster_size = file->disk->bpb.BPB_SecPerClus * file->disk->bpb.BPB_BytsPerSec;
+
+	unsigned int data_size = element_size * element_count;
+
+	while (1) {
+		if (current_file_cluster < 2) {
+			break;
+		}
+
+		unsigned int next_cluster = read_fat_entry(file->disk, current_file_cluster);
+
+		if (next_cluster == 0x0FFFFFF7) {
+			// Cluster is bad
+			break;
+		}
+
+		if (next_cluster == 0x0 || (next_cluster >= 0x0FFFFFF8 && next_cluster <= 0x0FFFFFFF)) {
+			// Cluster is free, allocate a new cluster or if it is the last cluster, check if the data fits
+			if (file->cursor + data_size <= cluster_write_data_offset + cluster_size) {
+				// Set the current cluster as the last cluster
+				next_cluster = 0x0FFFFFFF;
+			}
+			else{
+				// The remaining data does not fit in the current cluster
+				// Find next free cluster
+				unsigned int disk_size = (file->disk->bpb.BPB_TotSec32 == 0) ? file->disk->bpb.BPB_TotSec16 : file->disk->bpb.BPB_TotSec32;
+				unsigned int free_cluster = current_file_cluster + 1;
+				while (read_fat_entry(file->disk, free_cluster) != 0x0) {
+					free_cluster++;
+					if (free_cluster * file->disk->bpb.BPB_SecPerClus >= disk_size) {
+						// No free clusters
+						return 0;
+					}
+				}
+				// Set the current cluster to point to the next cluster
+				next_cluster = free_cluster;
+			}
+
+			write_fat_entry(file->disk, current_file_cluster, next_cluster);
+		}
+
+		unsigned int cluster_offset = first_data_sector + (current_file_cluster - 2) * file->disk->bpb.BPB_SecPerClus;
+		
+		cluster_write_data_offset += cluster_size;
+		unsigned int part_size = cluster_size;
+
+		if (cluster_write_data_offset > file->cursor) {
+			unsigned int bytes_to_write = (data_size > (part_size + write_total_bytes)) ? part_size : (data_size - write_total_bytes);
+			unsigned int dst_write_offset = cluster_offset * file->disk->bpb.BPB_BytsPerSec;
+			
+			if (cluster_write_data_offset - file->cursor <= cluster_size) {
+				// if writing to the first cluster, we might want to skip the first bytes
+				// next clusters will always be written from the beginning
+				unsigned int skip_bytes = cluster_size - (cluster_write_data_offset - file->cursor);
+				dst_write_offset += skip_bytes;
+
+				if (bytes_to_write + skip_bytes > part_size) {
+					// If the read goes over the cluster boundary, trim the read size
+					bytes_to_write -= (bytes_to_write + skip_bytes) - part_size;
+				}
+			}
+
+			// Write the part of the cluster that is needed
+			// subtract the size of the cluster because it has already been added to the total size
+			file->disk->write_func((unsigned char*)data_in + write_total_bytes, dst_write_offset, bytes_to_write, file->disk->user_args);
+
+			write_total_bytes += bytes_to_write;
+		}
+
+
+		if (next_cluster >= 0x0FFFFFF8 && next_cluster <= 0x0FFFFFFF) {
+			// Last cluster in the file.
+			// May be interpreted as an allocated cluster and the final	cluster in the file(indicating end-of-file condition).
+			break;
+		}
+
+		if (next_cluster == 0xFFFFFFFF) {
+			// Cluster is allocated and is the final cluster for the file (indicates end-of-file).
+			break;
+		}
+
+		current_file_cluster = next_cluster & 0x0FFFFFFF;
+	}
+
+	file->cursor += write_total_bytes;
+
+	if (file->cursor > file_dir->DIR_FileSize) {
+		file_dir->DIR_FileSize = file->cursor;
+		fat_update_entry(file);
+	}
+
+	return 1;
+}
+
 void fat_fseek(fat_FILE* file, int offset, int origin) {
 	if (origin == fat_SEEK_SET) {
 		file->cursor = offset;
@@ -193,6 +320,7 @@ int fat_ftell(fat_FILE* file) {
 
 // Returns fat_NOT_FOUND if not found, fat_FOUND_DIR if found and is a directory, fat_FOUND_FILE if found and is a file
 // If read_at_cursor is set to 1, the function will read the entry at the cursor position and return the result. The enrtry can be a file or a directory.
+// If is_file is set to 1, the function will return fat_FOUND_FILE only if the entry is a file. fat_FOUND_DIR will not be returned, even if the directory with the same name exists.
 static int fat_find(fat_DIR* subdir_out, fat_FILE* file_out, fat_DIR* root_dir, const char* path, unsigned char is_file, unsigned char read_at_cursor) {
 	subdir_out->disk = root_dir->disk;
 	if (file_out != NULL) {
@@ -328,6 +456,14 @@ static int fat_find(fat_DIR* subdir_out, fat_FILE* file_out, fat_DIR* root_dir, 
 							found = fat_FOUND_FILE;
 							if (file_out != NULL) {
 								file_out->fat_dir = subdir_out->fat_dir;
+								
+								unsigned int first_fat_sector = directory_file.disk->bpb.BPB_RsvdSecCnt;
+								unsigned int first_data_sector = first_fat_sector + (directory_file.disk->bpb.BPB_NumFATs * directory_file.disk->bpb.BPB_FATSz32);
+								unsigned int current_file_cluster = directory_file.fat_dir.DIR_FstClusLO;
+								unsigned int cluster_offset = first_data_sector + (current_file_cluster - 2) * directory_file.disk->bpb.BPB_SecPerClus;
+
+								file_out->entry_position = dir_offset - sizeof(fat_dir_entry) + cluster_offset * directory_file.disk->bpb.BPB_BytsPerSec;
+								
 								memory_copy(file_out->long_filename, subdir_out->long_filename, sizeof(subdir_out->long_filename));
 							}
 							break;
@@ -368,8 +504,9 @@ int fat_fopen(fat_FILE* file_out, fat_DIR* root_dir, const char* path) {
 	return success;
 }
 
-int fat_init(fat_DISK* disk, fat_disk_read_func_t read_func, void* user_args) {
+int fat_init(fat_DISK* disk, fat_disk_access_func_t read_func, fat_disk_access_func_t write_func, void* user_args) {
 	disk->read_func = read_func;
+	disk->write_func = write_func;
 	disk->user_args = user_args;
 
 	// Read the BPB

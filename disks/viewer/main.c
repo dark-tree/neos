@@ -13,6 +13,7 @@ void interactive_file_explorer(fat_DISK* disk) {
 	printf("  ls               list files in current directory\n");
 	printf("  cd <directory>   change directory\n");
 	printf("  cat <file>       print file contents\n");
+	printf("  cat >> <file>    append to file\n");
 	printf("  save <file>      save file to disk\n");
 	printf("  exit             exit the program\n");
 
@@ -33,7 +34,7 @@ void interactive_file_explorer(fat_DISK* disk) {
 		fgets(command, 256, stdin);
 		command[strlen(command) - 1] = '\0';
 
-		if (strcmp(command, "exit") == 0) {
+		if (strcmp(command, "exit") == 0 || strcmp(command, "quit") == 0) {
 			break;
 		} 
 		else {
@@ -65,21 +66,39 @@ void interactive_file_explorer(fat_DISK* disk) {
 				continue;
 			}
 			else if (strncmp(command, "cat ", 4) == 0) {
-				char* path = command + 4;
-				if (fat_fopen(&tmp_file, &current_dir, path)) {
-					fat_fseek(&tmp_file, 0, fat_SEEK_END);
-					unsigned int size = fat_ftell(&tmp_file);
-					fat_fseek(&tmp_file, 0, fat_SEEK_SET);
+				if (strncmp(command, "cat >> ", 7) == 0) {
+					// append to file
+					char* path = command + 7;
+					if (fat_fopen(&tmp_file, &current_dir, path)) {
+						fat_fseek(&tmp_file, -1, fat_SEEK_END);
 
-					char* buffer = (char*)malloc(size + 1);
-					fat_fread(buffer, 1, size, &tmp_file);
-					buffer[size] = '\0';
+						fgets(command, 256, stdin);
+						command[strlen(command) - 1] = '\0';
 
-					printf("%s", buffer);
-					free(buffer);
+						fat_fwrite(command, 1, strlen(command), &tmp_file);
+					}
+					else {
+						printf("Error: Could not open file\n");
+					}
 				}
-				else {
-					printf("Error: Could not open file\n");
+				else{
+					// print file contents
+					char* path = command + 4;
+					if (fat_fopen(&tmp_file, &current_dir, path)) {
+						fat_fseek(&tmp_file, 0, fat_SEEK_END);
+						unsigned int size = fat_ftell(&tmp_file);
+						fat_fseek(&tmp_file, 0, fat_SEEK_SET);
+
+						char* buffer = (char*)malloc(size + 1);
+						fat_fread(buffer, 1, size, &tmp_file);
+						buffer[size] = '\0';
+
+						printf("%s", buffer);
+						free(buffer);
+					}
+					else {
+						printf("Error: Could not open file\n");
+					}
 				}
 				continue;
 			}
@@ -125,17 +144,55 @@ void interactive_file_explorer(fat_DISK* disk) {
 	}
 }
 
+void fs_test(fat_DISK* disk) {
+	for (int i = 0; i < 1; i++) {
+		fat_FILE file;
+		if (fat_fopen(&file, &disk->root_directory, "files/readme.txt")) {
+			fat_fseek(&file, 0xff, fat_SEEK_END);
+
+			unsigned char data[512];
+			for (int i = 0; i < 512; i++) {
+				data[i] = 'A' + (i % 26);
+			}
+			fat_fwrite(data, 1, 512, &file);
+			fat_fwrite("\n", 1, 1, &file);
+			
+
+			fat_fseek(&file, 0, fat_SEEK_END);
+			unsigned int size_read = fat_ftell(&file);
+			fat_fseek(&file, 0, fat_SEEK_SET);
+
+			char* buffer = (char*)malloc(size_read + 1);
+			fat_fread(buffer, 1, size_read, &file);
+			buffer[size_read] = '\0';
+
+			printf("Result\n");
+			fat_print_buffer((unsigned char*)buffer, size_read);
+			free(buffer);
+		}
+		else {
+			printf("Error: Could not open file\n");
+		}
+	}
+}
+
 void disk_read_func(unsigned char* data_out, unsigned int offset_in, unsigned int size_in, void* user_args) {
 	FILE* file = (FILE*)user_args;
 	fseek(file, offset_in, SEEK_SET);
 	fread(data_out, 1, size_in, file);
 }
 
+void disk_write_func(unsigned char* data_in, unsigned int offset_in, unsigned int size_in, void* user_args) {
+	FILE* file = (FILE*)user_args;
+	fseek(file, offset_in, SEEK_SET);
+	fwrite(data_in, 1, size_in, file);
+}
+
 int main() {
 	const char* image_file = "floppy.img";
 
 	// open the image file
-	FILE* file = fopen(image_file, "rb");
+	FILE* file = fopen(image_file, "rb+");
 	if (file == NULL) {
 		printf("Error: Could not open file %s\n", image_file);
 		return 1;
@@ -143,10 +200,11 @@ int main() {
 
 	// create FAT disk with attached disk image access method
 	fat_DISK disk;
-	if(!fat_init(&disk, disk_read_func, file)) {
+	if(!fat_init(&disk, disk_read_func, disk_write_func, file)) {
 		return 1;
 	}
 
+	//fs_test(&disk);
 	interactive_file_explorer(&disk);
 
 	fclose(file);

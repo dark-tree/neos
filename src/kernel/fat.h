@@ -1,16 +1,16 @@
 #pragma once
 
 /**
- * @brief Function that is called when reading data from the disk
+ * @brief Signature of the function that is called when reading/writing data from/to the disk
  * 
- * @param data_out pointer to the array where the read data will be stored
- * @param offset_in the offset in bytes from the start of the disk where the read will start
- * @param size_in the number of bytes to read
+ * @param data pointer to the array where the read data will be stored or read from
+ * @param offset_in the offset in bytes from the start of the disk where the read/write will start
+ * @param size_in the number of bytes to read/write
  * @param user_args user arguments that are passed to the function
  * 
  * @return None
 */
-typedef void(*fat_disk_read_func_t)(unsigned char* data_out, unsigned int offset_in, unsigned int size_in, void* user_args);
+typedef void(*fat_disk_access_func_t)(unsigned char* data, unsigned int offset_in, unsigned int size_in, void* user_args);
 
 // for compiling outside of the kernel
 // #define kprintf printf
@@ -47,7 +47,7 @@ typedef struct fat_bpb_s {
 	unsigned int BPB_TotSec32;			// total_sectors_32
 
 	// FAT32 Extended BPB
-	unsigned int BPB_FATSz32;			// table_size_32
+	unsigned int BPB_FATSz32;			// table_size_32, count of sectors occupied by one FAT
 	unsigned short BPB_ExtFlags;		// extended_flags
 	unsigned short BPB_FSVer;			// fat_version
 	unsigned int BPB_RootClus;			// root_cluster
@@ -85,6 +85,7 @@ typedef struct fat_DISK_s fat_DISK;
 
 typedef struct fat_FILE_s {
 	fat_dir_entry fat_dir;
+	unsigned int entry_position;
 	fat_DISK* disk;
 	unsigned int cursor;
 	unsigned char long_filename[260 * 2];
@@ -98,7 +99,8 @@ typedef struct fat_DIR_s {
 } fat_DIR;
 
 typedef struct fat_DISK_s {
-	fat_disk_read_func_t read_func;
+	fat_disk_access_func_t read_func;
+	fat_disk_access_func_t write_func;
 	void* user_args;
 	fat_bpb bpb;
 	fat_DIR root_directory;
@@ -115,6 +117,18 @@ typedef struct fat_DISK_s {
  * @return None
 */
 void fat_fread(void* data_out, unsigned int element_size, unsigned int element_count, fat_FILE* file);
+
+/**
+ * @brief Write the data to the file
+ * 
+ * @param data_in pointer to the array where the objects are stored
+ * @param element_size size of each object in bytes
+ * @param element_count number of objects to write
+ * @param file file to write to
+ * 
+ * @return None
+*/
+unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int element_count, fat_FILE* file);
 
 /**
  * @brief Move the cursor in the file
@@ -183,11 +197,12 @@ int fat_fopen(fat_FILE* file_out, fat_DIR* root_dir, const char* path);
  * 
  * @param disk FAT disk to initialize
  * @param read_func function to read the data from the disk
+ * @param write_func function to write the data to the disk
  * @param user_args arguments to pass to the read
  * 
  * @return 1 if the disk was initialized, 0 if the disk was not initialized
 */
-int fat_init(fat_DISK* disk, fat_disk_read_func_t read_func, void* user_args);
+int fat_init(fat_DISK* disk, fat_disk_access_func_t read_func, fat_disk_access_func_t write_func, void* user_args);
 
 /* helper functions */
 
