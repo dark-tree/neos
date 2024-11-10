@@ -13,7 +13,9 @@ void interactive_file_explorer(fat_DISK* disk) {
 	printf("  ls               list files in current directory\n");
 	printf("  cd <directory>   change directory\n");
 	printf("  cat <file>       print file contents\n");
+	printf("  cat > <file>     write to file\n");
 	printf("  cat >> <file>    append to file\n");
+	printf("  rm <file>        remove file\n");
 	printf("  save <file>      save file to disk\n");
 	printf("  exit             exit the program\n");
 
@@ -29,7 +31,7 @@ void interactive_file_explorer(fat_DISK* disk) {
 
 	while (1) {
 		
-		fat_print_longname(current_dir.long_filename);
+		fat_print_longname(current_dir.dir_file.long_filename);
 		printf("> ");
 		fgets(command, 256, stdin);
 		command[strlen(command) - 1] = '\0';
@@ -46,7 +48,7 @@ void interactive_file_explorer(fat_DISK* disk) {
 						printf("\n");
 					}
 					else if (type == fat_FOUND_DIR) {
-						fat_print_longname(tmp_dir.long_filename);
+						fat_print_longname(tmp_dir.dir_file.long_filename);
 						printf("/\n");
 					}
 				}
@@ -66,11 +68,41 @@ void interactive_file_explorer(fat_DISK* disk) {
 				continue;
 			}
 			else if (strncmp(command, "cat ", 4) == 0) {
-				if (strncmp(command, "cat >> ", 7) == 0) {
+				if (strncmp(command, "cat >>", 6) == 0) {
 					// append to file
-					char* path = command + 7;
-					if (fat_fopen(&tmp_file, &current_dir, path)) {
-						fat_fseek(&tmp_file, -1, fat_SEEK_END);
+					char* path = command + 6 + (command[6] == ' ' ? 1 : 0);
+
+					if (fat_fopen(&tmp_file, &current_dir, path, "a")) {
+
+						fat_fseek(&tmp_file, 0, fat_SEEK_END);
+
+						// If appending to a non-empty file, add a newline instead of the last null byte
+						if (fat_ftell(&tmp_file) > 0) {
+							char last_byte;
+							fat_fread(&last_byte, 1, 1, &tmp_file);
+
+							if (last_byte == 0) {
+								fat_fseek(&tmp_file, -1, fat_SEEK_END);
+							}
+
+							fat_fwrite("\n", 1, 1, &tmp_file);
+						}
+
+						fgets(command, 256, stdin);
+						command[strlen(command) - 1] = '\0';
+
+						fat_fwrite(command, 1, strlen(command), &tmp_file);
+					}
+					else {
+						printf("Error: Could not open file\n");
+					}
+				}
+				else if (strncmp(command, "cat >", 5) == 0) {
+					// write to file
+					char* path = command + 5 + (command[5] == ' ' ? 1 : 0);
+
+					if (fat_fopen(&tmp_file, &current_dir, path, "w")) {
+						fat_fseek(&tmp_file, 0, fat_SEEK_END);
 
 						fgets(command, 256, stdin);
 						command[strlen(command) - 1] = '\0';
@@ -84,7 +116,7 @@ void interactive_file_explorer(fat_DISK* disk) {
 				else{
 					// print file contents
 					char* path = command + 4;
-					if (fat_fopen(&tmp_file, &current_dir, path)) {
+					if (fat_fopen(&tmp_file, &current_dir, path, "r")) {
 						fat_fseek(&tmp_file, 0, fat_SEEK_END);
 						unsigned int size = fat_ftell(&tmp_file);
 						fat_fseek(&tmp_file, 0, fat_SEEK_SET);
@@ -102,9 +134,19 @@ void interactive_file_explorer(fat_DISK* disk) {
 				}
 				continue;
 			}
+			else if (strncmp(command, "rm ", 3) == 0) {
+				char* path = command + 3;
+				if (fat_remove(&current_dir, path, 1)) {
+					printf("File removed\n");
+				}
+				else {
+					printf("Error: Could not remove file\n");
+				}
+				continue;
+			}
 			else if (strncmp(command, "save ", 5) == 0) {
 				char* path = command + 5;
-				if (fat_fopen(&tmp_file, &current_dir, path)) {
+				if (fat_fopen(&tmp_file, &current_dir, path, "r")) {
 					char buffer[256];
 					fat_longname_to_string(tmp_file.long_filename, buffer);
 
@@ -147,7 +189,7 @@ void interactive_file_explorer(fat_DISK* disk) {
 void fs_test(fat_DISK* disk) {
 	for (int i = 0; i < 1; i++) {
 		fat_FILE file;
-		if (fat_fopen(&file, &disk->root_directory, "files/readme.txt")) {
+		if (fat_fopen(&file, &disk->root_directory, "files/readme.txt", "r")) {
 			fat_fseek(&file, 0xff, fat_SEEK_END);
 
 			unsigned char data[512];

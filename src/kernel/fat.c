@@ -21,7 +21,38 @@ static void to_lowercase_str(char* str) {
 	}
 }
 
-static void shortname_to_longname(const char* shortname, char* longname) {
+static int fat_itoa(unsigned int value, char* buffer, unsigned int base) {
+	if (value == 0) {
+		buffer[0] = '0';
+		buffer[1] = '\0';
+		return 1;
+	}
+
+	int i = 0;
+	while (value > 0) {
+		int digit = value % base;
+		buffer[i++] = (digit < 10) ? '0' + digit : 'A' + digit - 10;
+		value /= base;
+	}
+	buffer[i] = '\0';
+
+	int length = i;
+
+	// Reverse the string
+	int j = 0;
+	i--;
+	while (j < i) {
+		char tmp = buffer[j];
+		buffer[j] = buffer[i];
+		buffer[i] = tmp;
+		j++;
+		i--;
+	}
+
+	return length;
+}
+
+static void shortname_to_longname(const char* shortname, unsigned short* longname) {
 	/*
 	* Convert a short name to a long name.
 	* The short name is in the format "FILE.TXT" and the long name is in the format "FILE    TXT".
@@ -29,8 +60,7 @@ static void shortname_to_longname(const char* shortname, char* longname) {
 	* If the name is less than 8 characters, it is padded with spaces.
 	*/
 
-	// Cast to short* so that we can write 2 bytes at a time
-	short* longname_short = (short*)longname;
+	unsigned short* longname_short = (unsigned short*)longname;
 
 	for (int i = 0; i < 8; i++) {
 		if (shortname[i] == ' ') {
@@ -80,15 +110,33 @@ static int path_compare(const char* path, const char* dir_name, unsigned char ch
 	return 0;
 }
 
-static void memory_copy(unsigned char* dest, unsigned char* src, unsigned int size) {
+static void memory_copy(void* dest, void* src, unsigned int size) {
+	unsigned char* dest_b = (unsigned char*)dest;
+	unsigned char* src_b = (unsigned char*)src;
+
 	for (unsigned int i = 0; i < size; i++) {
-		dest[i] = src[i];
+		dest_b[i] = src_b[i];
 	}
 }
 
 /* FAT32 functions */
 
-static unsigned int read_fat_entry(fat_DISK* disk, unsigned int cluster) {
+static void fat_file_default(fat_FILE* file, fat_DISK* disk) {
+	file->cursor = 0;
+	file->entry_position = 0;
+	file->first_parent_cluster = 0;
+	file->lfn_present = 0;
+	file->disk = disk;
+	file->long_filename[0] = '\0';
+	for (int i = 1; i < sizeof(file->long_filename) / sizeof(file->long_filename[0]); i++) {
+		file->long_filename[i] = 0xffff;
+	}
+	for (int i = 0; i < sizeof(file->fat_dir); i++) {
+		((unsigned char*)&(file->fat_dir))[i] = '\0';
+	}
+}
+
+static unsigned int fat_read_fat_entry(fat_DISK* disk, unsigned int cluster) {
 	unsigned int fat_offset = disk->bpb.BPB_RsvdSecCnt * disk->bpb.BPB_BytsPerSec;
 
 	// Each entry is 4 bytes long
@@ -98,7 +146,7 @@ static unsigned int read_fat_entry(fat_DISK* disk, unsigned int cluster) {
 	return fat_entry;
 }
 
-static void write_fat_entry(fat_DISK* disk, unsigned int cluster, unsigned int value) {
+static void fat_write_fat_entry(fat_DISK* disk, unsigned int cluster, unsigned int value) {
 	unsigned int fat_offset = disk->bpb.BPB_RsvdSecCnt * disk->bpb.BPB_BytsPerSec;
 
 	// Each entry is 4 bytes long
@@ -136,7 +184,7 @@ void fat_fread(void* data_out, unsigned int element_size, unsigned int element_c
 			break;
 		}
 
-		unsigned int next_cluster = read_fat_entry(file->disk, current_file_cluster);
+		unsigned int next_cluster = fat_read_fat_entry(file->disk, current_file_cluster);
 
 		if (next_cluster == 0x0) {
 			// Cluster is free
@@ -194,8 +242,69 @@ void fat_fread(void* data_out, unsigned int element_size, unsigned int element_c
 	file->cursor += read_total_bytes;
 }
 
+unsigned int fat_file_cluster_count(fat_FILE* file) {
+	unsigned int current_file_cluster = file->fat_dir.DIR_FstClusLO;
+	unsigned int next_cluster = 0;
+	unsigned int cluster_count = 0;
+
+	while (1) {
+		if (current_file_cluster < 2) {
+			break;
+		}
+
+		next_cluster = fat_read_fat_entry(file->disk, current_file_cluster);
+
+		if (next_cluster == 0x0FFFFFF7) {
+			// Cluster is bad
+			break;
+		}
+
+		if (next_cluster == 0x0) {
+			// Cluster is free
+			break;
+		}
+
+		cluster_count++;
+
+		if (next_cluster >= 0x0FFFFFF8 && next_cluster <= 0x0FFFFFFF) {
+			// Last cluster in the file.
+			// May be interpreted as an allocated cluster and the final	cluster in the file(indicating end-of-file condition).
+			break;
+		}
+
+		if (next_cluster == 0xFFFFFFFF) {
+			// Cluster is allocated and is the final cluster for the file (indicates end-of-file).
+			break;
+		}
+
+		current_file_cluster = next_cluster & 0x0FFFFFFF;
+	}
+
+	return cluster_count;
+}
+
 static void fat_update_entry(fat_FILE* dir) {
-	dir->disk->write_func((unsigned char*)(&dir->fat_dir), dir->entry_position, sizeof(fat_dir_entry), dir->disk->user_args);
+	if (dir->first_parent_cluster < 2) {
+		return;
+	}
+
+	fat_DIR parent_dir;
+	fat_file_default(&parent_dir.dir_file, dir->disk);
+	parent_dir.dir_file.fat_dir.DIR_FstClusLO = dir->first_parent_cluster;
+	parent_dir.dir_file.fat_dir.DIR_FileSize = fat_file_cluster_count(&parent_dir.dir_file) * parent_dir.dir_file.disk->bpb.BPB_SecPerClus * parent_dir.dir_file.disk->bpb.BPB_BytsPerSec;
+
+	fat_fseek(&parent_dir.dir_file, dir->entry_position, fat_SEEK_SET);
+	fat_fwrite((unsigned char*)&dir->fat_dir, sizeof(fat_dir_entry), 1, &parent_dir.dir_file);
+}
+
+static void fat_read_entry(fat_FILE* dir) {
+	fat_DIR parent_dir;
+	fat_file_default(&parent_dir.dir_file, dir->disk);
+	parent_dir.dir_file.fat_dir.DIR_FstClusLO = dir->first_parent_cluster;
+	parent_dir.dir_file.fat_dir.DIR_FileSize = fat_file_cluster_count(&parent_dir.dir_file) * parent_dir.dir_file.disk->bpb.BPB_SecPerClus * parent_dir.dir_file.disk->bpb.BPB_BytsPerSec;
+
+	fat_fseek(&parent_dir.dir_file, dir->entry_position, fat_SEEK_SET);
+	fat_fread((unsigned char*)&dir->fat_dir, sizeof(fat_dir_entry), 1, &parent_dir.dir_file);
 }
 
 unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int element_count, fat_FILE* file) {
@@ -217,7 +326,7 @@ unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int 
 			break;
 		}
 
-		unsigned int next_cluster = read_fat_entry(file->disk, current_file_cluster);
+		unsigned int next_cluster = fat_read_fat_entry(file->disk, current_file_cluster);
 
 		if (next_cluster == 0x0FFFFFF7) {
 			// Cluster is bad
@@ -235,7 +344,7 @@ unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int 
 				// Find next free cluster
 				unsigned int disk_size = (file->disk->bpb.BPB_TotSec32 == 0) ? file->disk->bpb.BPB_TotSec16 : file->disk->bpb.BPB_TotSec32;
 				unsigned int free_cluster = current_file_cluster + 1;
-				while (read_fat_entry(file->disk, free_cluster) != 0x0) {
+				while (fat_read_fat_entry(file->disk, free_cluster) != 0x0) {
 					free_cluster++;
 					if (free_cluster * file->disk->bpb.BPB_SecPerClus >= disk_size) {
 						// No free clusters
@@ -246,7 +355,7 @@ unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int 
 				next_cluster = free_cluster;
 			}
 
-			write_fat_entry(file->disk, current_file_cluster, next_cluster);
+			fat_write_fat_entry(file->disk, current_file_cluster, next_cluster);
 		}
 
 		unsigned int cluster_offset = first_data_sector + (current_file_cluster - 2) * file->disk->bpb.BPB_SecPerClus;
@@ -319,29 +428,29 @@ int fat_ftell(fat_FILE* file) {
 }
 
 // Returns fat_NOT_FOUND if not found, fat_FOUND_DIR if found and is a directory, fat_FOUND_FILE if found and is a file
-// If read_at_cursor is set to 1, the function will read the entry at the cursor position and return the result. The enrtry can be a file or a directory.
+// If read_at_cursor is set to 1, the function will read the entry at the cursor position and return the result. The entry can be a file or a directory. The is_file parameter will be ignored.
 // If is_file is set to 1, the function will return fat_FOUND_FILE only if the entry is a file. fat_FOUND_DIR will not be returned, even if the directory with the same name exists.
-static int fat_find(fat_DIR* subdir_out, fat_FILE* file_out, fat_DIR* root_dir, const char* path, unsigned char is_file, unsigned char read_at_cursor) {
-	subdir_out->disk = root_dir->disk;
+// If is_file is set to 0, the function will return fat_FOUND_DIR only if the entry is a directory. fat_FOUND_FILE will not be returned, even if the file with the same name exists.
+static int fat_find_full(fat_DIR* subdir_out, fat_FILE* file_out, fat_DIR* root_dir, const char* path, unsigned char is_file, unsigned char read_at_cursor, unsigned char use_shortname) {
+	fat_file_default(&subdir_out->dir_file, root_dir->dir_file.disk);
 	if (file_out != NULL) {
-		file_out->disk = root_dir->disk;
+		fat_file_default(file_out, root_dir->dir_file.disk);
 	}
 
 	// Special case for the root directory
-	if (root_dir->fat_dir.DIR_FstClusLO < 2) {
-		root_dir->fat_dir.DIR_FstClusLO = 2;
+	if (root_dir->dir_file.fat_dir.DIR_FstClusLO < 2) {
+		root_dir->dir_file.fat_dir.DIR_FstClusLO = 2;
 	}
 
 	// The directory is a file that contains the directory entries
 	fat_FILE directory_file = {
-		.disk = subdir_out->disk,
-		.fat_dir = root_dir->fat_dir,
+		.disk = subdir_out->dir_file.disk,
+		.fat_dir = root_dir->dir_file.fat_dir,
 		.cursor = 0
 	};
 	// Directories do not hold information about their size so
-	// set the file size to -1 which is maximum unsigned int value
-	// the arguments of the read function will control the size of the read
-	directory_file.fat_dir.DIR_FileSize = -1;
+	// set the file size to the number of sectors of the directory
+	directory_file.fat_dir.DIR_FileSize = fat_file_cluster_count(&directory_file) * directory_file.disk->bpb.BPB_SecPerClus * directory_file.disk->bpb.BPB_BytsPerSec;
 
 	// For iterating through the directory
 	unsigned int dir_offset = 0;
@@ -350,79 +459,79 @@ static int fat_find(fat_DIR* subdir_out, fat_FILE* file_out, fat_DIR* root_dir, 
 	// Long file name:
 	// "Up to 20 of these 13-character entries may be chained, supporting a maximum length of 255 UCS-2 characters"
 	// 20 * 13 = 260 just to be safe
-	// 260 * 2 because each character is 2 bytes
 	unsigned char lfn_present = 0;
 
 	int found = fat_NOT_FOUND;
 
 	while (1) {
+		// Check if reached the end of the directory
+		if (dir_offset >= directory_file.fat_dir.DIR_FileSize) {
+			break;
+		}
+
 		// Read the directory entry
 		// TODO: fat_fread function performs at least 2 reads each time it's called, and it's called for each directory entry which is a lot of reads,
 		// in real world application it would probably be better to read for example one cluster at a time and then iterate through the entries in memory.
 		// The way it's implemented now is more readable though, so it is what it is for now.
 		fat_fseek(&directory_file, dir_offset, fat_SEEK_SET);
-		fat_fread((unsigned char*)&subdir_out->fat_dir, sizeof(fat_dir_entry), 1, &directory_file);
+		fat_fread((unsigned char*)&subdir_out->dir_file.fat_dir, sizeof(fat_dir_entry), 1, &directory_file);
 		dir_offset += sizeof(fat_dir_entry);
 
-		if (subdir_out->fat_dir.DIR_Name[0] == 0x00) {
+		if (subdir_out->dir_file.fat_dir.DIR_Name[0] == 0x00) {
 			// "0x00 is an additional indicator that all directory entries following the current free entry are also free"
 			break;
 		}
 
-		if (subdir_out->fat_dir.DIR_Name[0] == 0xE5) {
+		if (subdir_out->dir_file.fat_dir.DIR_Name[0] == 0xE5) {
 			// "indicates the directory entry is free (available)"
 			continue;
 		}
 
-		if (subdir_out->fat_dir.DIR_Attr == 0x0F) {
+		if (subdir_out->dir_file.fat_dir.DIR_Attr == 0x0F) {
 			// Long file name
-			unsigned char long_filename_index = subdir_out->fat_dir.DIR_Name[0] & 0x0F;
-			unsigned int long_filename_offset = (long_filename_index - 1) * (13 * 2);
+			unsigned char long_filename_index = subdir_out->dir_file.fat_dir.DIR_Name[0] & 0x0F;
+			unsigned int long_filename_offset = (long_filename_index - 1) * 13;
 
-			// the size of the directory entry is 32 bytes and the DIR_Name field is in the beginning of the struct
-			// so by accessing indices higher than 11 (size of DIR_Name), we can access the rest of the fields 
-			// in struct without worrying about their names
-			for (int i = 0; i < 5 * 2; i++) {
-				subdir_out->long_filename[long_filename_offset + i] = subdir_out->fat_dir.DIR_Name[1 + i];
+			// the long file name is split into 3 parts in the single entry
+			for (int i = 0; i < 5; i++) {
+				subdir_out->dir_file.long_filename[long_filename_offset + i] = subdir_out->dir_file.fat_lfn.LDIR_Name1[i];
 			}
-			for (int i = 0; i < 6 * 2; i++) {
-				subdir_out->long_filename[long_filename_offset + 10 + i] = subdir_out->fat_dir.DIR_Name[14 + i];
+			for (int i = 0; i < 6; i++) {
+				subdir_out->dir_file.long_filename[long_filename_offset + 5 + i] = subdir_out->dir_file.fat_lfn.LDIR_Name2[i];
 			}
-			for (int i = 0; i < 2 * 2; i++) {
-				subdir_out->long_filename[long_filename_offset + ((5 + 6) * 2) + i] = subdir_out->fat_dir.DIR_Name[28 + i];
+			for (int i = 0; i < 2; i++) {
+				subdir_out->dir_file.long_filename[long_filename_offset + (5 + 6) + i] = subdir_out->dir_file.fat_lfn.LDIR_Name3[i];
 			}
 
-			if (subdir_out->fat_dir.DIR_Name[0] & 0x40) {
+			if (subdir_out->dir_file.fat_dir.DIR_Name[0] & 0x40) {
 				// Last long file name entry
 				// but actually, it's the first one in the memory
 				lfn_present = 1;
 
 				// add the null terminator
-				subdir_out->long_filename[long_filename_offset + 13 * 2] = '\0';
-				subdir_out->long_filename[long_filename_offset + 13 * 2 + 1] = '\0';
+				subdir_out->dir_file.long_filename[long_filename_offset + 13] = '\0';
 			}
 
 			continue;
 		}
 
 		int dir_name_length = 0;
-		if (lfn_present) {
-			lfn_present = 0;
-			dir_name_length = path_compare(path, subdir_out->long_filename, 2, 1);
+		if (lfn_present && !use_shortname) {
+			dir_name_length = path_compare(path, (char*)subdir_out->dir_file.long_filename, 2, 1);
 		}
 		else {
-			shortname_to_longname(subdir_out->fat_dir.DIR_Name, subdir_out->long_filename);
-			dir_name_length = path_compare(path, subdir_out->long_filename, 2, 0);
+			shortname_to_longname(subdir_out->dir_file.fat_dir.DIR_Name, subdir_out->dir_file.long_filename);
+			dir_name_length = path_compare(path, (char*)subdir_out->dir_file.long_filename, 2, 0);
 		}
 
 		if (read_at_cursor){
-			if (entries == root_dir->cursor) {
-				found = (subdir_out->fat_dir.DIR_Attr & 0x10) ? fat_FOUND_DIR : fat_FOUND_FILE;
+			if (entries == root_dir->dir_file.cursor) {
+				found = (subdir_out->dir_file.fat_dir.DIR_Attr & 0x10) ? fat_FOUND_DIR : fat_FOUND_FILE;
 				if (file_out != NULL && found == fat_FOUND_FILE) {
-					file_out->fat_dir = subdir_out->fat_dir;
-					memory_copy(file_out->long_filename, subdir_out->long_filename, sizeof(subdir_out->long_filename));
+					file_out->fat_dir = subdir_out->dir_file.fat_dir;
+					memory_copy(file_out->long_filename, subdir_out->dir_file.long_filename, sizeof(subdir_out->dir_file.long_filename));
 				}
-				root_dir->cursor++;
+				root_dir->dir_file.cursor++;
 				break;
 			}
 		}
@@ -432,7 +541,7 @@ static int fat_find(fat_DIR* subdir_out, fat_FILE* file_out, fat_DIR* root_dir, 
 				const char* next_path = path + dir_name_length + 1;
 
 				// Check if the entry is a directory
-				if (subdir_out->fat_dir.DIR_Attr & 0x10) {
+				if (subdir_out->dir_file.fat_dir.DIR_Attr & 0x10) {
 					// Entry is a directory
 					if (path[dir_name_length] == '\0') {
 						// check if the entry we are looking for is a directory
@@ -444,7 +553,8 @@ static int fat_find(fat_DIR* subdir_out, fat_FILE* file_out, fat_DIR* root_dir, 
 					}
 					else {
 						// Recursively search the directory
-						found = fat_find(subdir_out, file_out, subdir_out, next_path, is_file, read_at_cursor);
+						fat_DIR new_root_dir = *subdir_out;
+						found = fat_find_full(subdir_out, file_out, &new_root_dir, next_path, is_file, read_at_cursor, use_shortname);
 						break;
 					}
 				}
@@ -455,16 +565,13 @@ static int fat_find(fat_DIR* subdir_out, fat_FILE* file_out, fat_DIR* root_dir, 
 							// Found the file, end the search
 							found = fat_FOUND_FILE;
 							if (file_out != NULL) {
-								file_out->fat_dir = subdir_out->fat_dir;
-								
-								unsigned int first_fat_sector = directory_file.disk->bpb.BPB_RsvdSecCnt;
-								unsigned int first_data_sector = first_fat_sector + (directory_file.disk->bpb.BPB_NumFATs * directory_file.disk->bpb.BPB_FATSz32);
-								unsigned int current_file_cluster = directory_file.fat_dir.DIR_FstClusLO;
-								unsigned int cluster_offset = first_data_sector + (current_file_cluster - 2) * directory_file.disk->bpb.BPB_SecPerClus;
+								file_out->fat_dir = subdir_out->dir_file.fat_dir;
 
-								file_out->entry_position = dir_offset - sizeof(fat_dir_entry) + cluster_offset * directory_file.disk->bpb.BPB_BytsPerSec;
-								
-								memory_copy(file_out->long_filename, subdir_out->long_filename, sizeof(subdir_out->long_filename));
+								file_out->entry_position = dir_offset - sizeof(fat_dir_entry);
+								file_out->first_parent_cluster = directory_file.fat_dir.DIR_FstClusLO;
+								file_out->lfn_present = lfn_present;
+
+								memory_copy(file_out->long_filename, subdir_out->dir_file.long_filename, sizeof(subdir_out->dir_file.long_filename));
 							}
 							break;
 						}
@@ -473,14 +580,22 @@ static int fat_find(fat_DIR* subdir_out, fat_FILE* file_out, fat_DIR* root_dir, 
 			}
 		}
 
+		if (lfn_present) {
+			lfn_present = 0;
+		}
+
 		entries++;
 	}
 
 	return found;
 }
 
+static int fat_find(fat_DIR* subdir_out, fat_FILE* file_out, fat_DIR* root_dir, const char* path, unsigned char is_file, unsigned char read_at_cursor) {
+	return fat_find_full(subdir_out, file_out, root_dir, path, is_file, read_at_cursor, 0);
+}
+
 void fat_rewinddir(fat_DIR* dir) {
-	dir->cursor = 0;
+	dir->dir_file.cursor = 0;
 }
 
 // Returns fat_NOT_FOUND if not found, fat_FOUND_DIR if found and is a directory, fat_FOUND_FILE if found and is a file
@@ -494,13 +609,388 @@ int fat_opendir(fat_DIR* subdir_out, fat_DIR* root_dir, const char* path) {
 		return 1;
 	}
 	int success = fat_find(subdir_out, NULL, root_dir, path, 0, 0);
-	subdir_out->cursor = 0;
+	subdir_out->dir_file.cursor = 0;
+	if (subdir_out->dir_file.fat_dir.DIR_FstClusLO < 2) {
+		subdir_out->dir_file.fat_dir.DIR_FstClusLO = 2;
+	}
 	return success;
 }
 
-int fat_fopen(fat_FILE* file_out, fat_DIR* root_dir, const char* path) {
+void fat_remove_fat_chain(fat_FILE* file){
+	unsigned int first_fat_sector = file->disk->bpb.BPB_RsvdSecCnt;
+	unsigned int first_data_sector = first_fat_sector + (file->disk->bpb.BPB_NumFATs * file->disk->bpb.BPB_FATSz32);
+
+	unsigned int current_file_cluster = file->fat_dir.DIR_FstClusLO;
+	unsigned int next_cluster = 0;
+	unsigned int cluster_size = file->disk->bpb.BPB_SecPerClus * file->disk->bpb.BPB_BytsPerSec;
+
+	while (1) {
+		if (current_file_cluster < 2) {
+			break;
+		}
+
+		next_cluster = fat_read_fat_entry(file->disk, current_file_cluster);
+
+		if (next_cluster == 0x0FFFFFF7) {
+			// Cluster is bad
+			break;
+		}
+
+		if (next_cluster == 0x0) {
+			// Cluster is free
+			break;
+		}
+
+		unsigned int cluster_offset = first_data_sector + (current_file_cluster - 2) * file->disk->bpb.BPB_SecPerClus;
+
+		// Set the current cluster as free
+		fat_write_fat_entry(file->disk, current_file_cluster, 0x0);
+
+		if (next_cluster >= 0x0FFFFFF8 && next_cluster <= 0x0FFFFFFF) {
+			// Last cluster in the file.
+			// May be interpreted as an allocated cluster and the final	cluster in the file(indicating end-of-file condition).
+			break;
+		}
+
+		if (next_cluster == 0xFFFFFFFF) {
+			// Cluster is allocated and is the final cluster for the file (indicates end-of-file).
+			break;
+		}
+
+		current_file_cluster = next_cluster & 0x0FFFFFFF;
+	}
+}
+
+unsigned char fat_lfn_checksum(const unsigned char* shortname) {
+	unsigned char checksum = 0;
+
+	for (int i = 0; i < 11; i++) {
+		checksum = ((checksum & 1) ? 0x80 : 0) + (checksum >> 1) + shortname[i];
+	}
+
+	return checksum;
+}
+
+// If remove is set to 1, the function will remove the long filename entries from the directory
+// If remove is set to 0, the function will recreate the long filename entries in the directory
+void fat_update_lfn(fat_FILE* file, unsigned char remove) {
+	fat_DIR parent_dir;
+	fat_file_default(&parent_dir.dir_file, file->disk);
+	parent_dir.dir_file.fat_dir.DIR_FstClusLO = file->first_parent_cluster;
+	parent_dir.dir_file.fat_dir.DIR_FstClusHI = file->first_parent_cluster >> 16;
+	parent_dir.dir_file.fat_dir.DIR_FileSize = fat_file_cluster_count(&parent_dir.dir_file) * parent_dir.dir_file.disk->bpb.BPB_SecPerClus * parent_dir.dir_file.disk->bpb.BPB_BytsPerSec;
+
+	if (file->lfn_present){
+		unsigned char lfn_entries = 0;
+		unsigned char lfn_checksum = 0;
+
+		if (!remove){
+			unsigned int lfn_length = 1;
+			while (file->long_filename[lfn_length] != '\0') {
+				lfn_length++;
+			}
+			// Round up
+			lfn_entries = (lfn_length - 1) / 13 + 1;
+
+			lfn_checksum = fat_lfn_checksum(file->fat_dir.DIR_Name);
+		}
+
+		unsigned char lfn_entry = 1;
+
+		unsigned int entry_position = file->entry_position;
+		while (1) {
+			entry_position -= sizeof(fat_dir_entry);
+			
+			if (remove){
+				fat_dir_entry fat_dir;
+				fat_fseek(&parent_dir.dir_file, entry_position, fat_SEEK_SET);
+				fat_fread((unsigned char*)&fat_dir, sizeof(fat_dir_entry), 1, &parent_dir.dir_file);
+
+				if (fat_dir.DIR_Attr != 0x0F) {
+					break;
+				}
+
+				// Mark the long filename entry as free
+				fat_dir.DIR_Name[0] = 0xE5;
+
+				fat_fseek(&parent_dir.dir_file, entry_position, fat_SEEK_SET);
+				fat_fwrite((unsigned char*)&fat_dir, sizeof(fat_dir_entry), 1, &parent_dir.dir_file);
+			}
+			else {
+				fat_lfn_entry fat_lfn = {
+					.LDIR_Ord = ((lfn_entry == lfn_entries) ? 0x40 : 0x00) | lfn_entry,
+					.LDIR_Attr = 0x0F,
+					.LDIR_Chksum = lfn_checksum
+				};
+				
+				unsigned int long_filename_offset = (lfn_entry - 1) * 13;
+				for (int i = 0; i < 5; i++) {
+					fat_lfn.LDIR_Name1[i] = file->long_filename[long_filename_offset + i];
+				}
+				for (int i = 0; i < 6; i++) {
+					fat_lfn.LDIR_Name2[i] = file->long_filename[long_filename_offset + 5 + i];
+				}
+				for (int i = 0; i < 2; i++) {
+					fat_lfn.LDIR_Name3[i] = file->long_filename[long_filename_offset + 5 + 6 + i];
+				}
+
+				fat_fseek(&parent_dir.dir_file, entry_position, fat_SEEK_SET);
+				fat_fwrite((unsigned char*)&fat_lfn, sizeof(fat_lfn_entry), 1, &parent_dir.dir_file);
+
+				lfn_entry++;
+				if (lfn_entry > lfn_entries) {
+					break;
+				}
+			}
+		}
+	}
+}
+
+unsigned char fat_remove(fat_DIR* root_dir, const char* path, unsigned char is_file) {
 	fat_DIR helper_dir;
-	int success = fat_find(&helper_dir, file_out, root_dir, path, 1, 0);
+	fat_FILE helper_file;
+	int find_success = fat_find(&helper_dir, &helper_file, root_dir, path, is_file, 0);
+
+	if (find_success == fat_FOUND_FILE) {
+		fat_update_lfn(&helper_file, 1);
+
+		// Set the entry in the directory as free
+		helper_file.fat_dir.DIR_Name[0] = 0xE5;
+		fat_update_entry(&helper_file);
+
+		fat_remove_fat_chain(&helper_file);
+
+		return 1;
+	}
+
+	return 0;
+}
+
+int fat_create(fat_FILE* new_file_out, fat_DIR* root_dir, const char* path) {
+	// Find the parent directory
+	unsigned int path_length = 0;
+	while (path[path_length] != '\0') {
+		path_length++;
+	}
+	int last_slash = path_length;
+	while (last_slash >= 0 && path[last_slash] != '/') {
+		last_slash--;
+	}
+	fat_DIR parent_dir;
+	if (last_slash > 0) {
+		// The path contains a directory
+		char parent_path[last_slash + 1];
+		for (int i = 0; i < last_slash; i++) {
+			parent_path[i] = path[i];
+		}
+		parent_path[last_slash] = '\0';
+
+		if (!fat_opendir(&parent_dir, root_dir, parent_path)) {
+			// The parent directory does not exist
+			return 0;
+		}
+	}
+	else {
+		// The root directory is the parent directory
+		fat_copy_DIR(&parent_dir, root_dir);
+	}
+
+	// Initialize the new file
+	fat_file_default(new_file_out, parent_dir.dir_file.disk);
+	new_file_out->fat_dir.DIR_Attr = 0x20;
+
+	/* File name */
+
+	int name_length = path_length - last_slash - 1;
+	if (name_length > 255) {
+		// The file name is too long
+		return 0;
+	}
+
+	for (int i = 0; i < 11; i++) {
+		new_file_out->fat_dir.DIR_Name[i] = ' ';
+	}
+
+	// Find last dot in the file name
+	unsigned int dot_position = path_length;
+	for (int i = last_slash + 1; i < path_length; i++) {
+		if (path[i] == '.') {
+			dot_position = i;
+		}
+	}
+
+	// Copy the file name
+	int short_name_index = 0;
+	for (int i = last_slash + 1; i < dot_position; i++) {
+		if (short_name_index >= 8) {
+			// The file name is too long
+			new_file_out->lfn_present = 1;
+			break;
+		}
+		// Copy the character and convert it to uppercase
+		new_file_out->fat_dir.DIR_Name[short_name_index++] = (path[i] >= 'a' && path[i] <= 'z') ? path[i] - ('a' - 'A') : path[i];
+	}
+
+	// Copy the file extension
+	short_name_index = 8;
+	for (int i = dot_position + 1; i < path_length; i++) {
+		if (short_name_index >= 11) {
+			// The file extension is too long
+			new_file_out->lfn_present = 1;
+			break;
+		}
+		// Copy the character and convert it to uppercase
+		new_file_out->fat_dir.DIR_Name[short_name_index++] = (path[i] >= 'a' && path[i] <= 'z') ? path[i] - ('a' - 'A') : path[i];
+	}
+
+	fat_string_to_longname(path + last_slash + 1, new_file_out->long_filename);
+
+	unsigned int lfn_entries = 0;
+
+	if (new_file_out->lfn_present) {
+		// The file name is too long, long file name will be used
+
+		// Create short version of the file name
+		// The short name is in the format: "FILE~1.TXT"
+		// The short name should be unique, so we increment the number at the end of the name if the name is already taken
+		unsigned int repeat = 1;
+		while (repeat < 1000) {
+			char repeat_str[4];
+			int repeat_len = fat_itoa(repeat, repeat_str, 10);
+
+			// Copy to the short name
+			new_file_out->fat_dir.DIR_Name[8 - repeat_len - 1] = '~';
+			for (int i = 0; i < repeat_len; i++) {
+				new_file_out->fat_dir.DIR_Name[8 - repeat_len + i] = repeat_str[i];
+			}
+
+			// Check if the short name is unique
+			fat_DIR helper_dir;
+			char helper_path[13];
+			for (int i = 0; i < 8; i++) {
+				helper_path[i] = new_file_out->fat_dir.DIR_Name[i];
+			}
+			helper_path[8] = '.';
+			for (int i = 0; i < 3; i++) {
+				helper_path[9 + i] = new_file_out->fat_dir.DIR_Name[8 + i];
+				if (helper_path[9 + i] == ' ') {
+					helper_path[9 + i] = '\0';
+					break;
+				}
+			}
+			helper_path[12] = '\0';
+
+			if (fat_find_full(&helper_dir, NULL, &parent_dir, helper_path, 1, 0, 1) == fat_NOT_FOUND) {
+				break;
+			}
+
+			repeat++;
+		}
+
+		// "name_length + 1" for the null terminator,
+		// "name_length + 1 - 1" and "/ 13 + 1" to round up
+		lfn_entries = (name_length + 1 - 1) / 13 + 1;
+	}
+
+	/* Create file */
+
+	fat_dir_entry helper_dir_entry;
+	unsigned int dir_offset = 0;
+
+	unsigned int required_entries = 1 + lfn_entries;
+	unsigned int found_contiguous_entries = 0;
+
+	// In FAT32, the size of the directory file is not saved in the directory entry (DIR_FileSize is 0), so we need to calculate it
+	// The size is required for the fat_fread and fat_fwrite functions to work correctly
+	parent_dir.dir_file.fat_dir.DIR_FileSize = fat_file_cluster_count(&parent_dir.dir_file) * parent_dir.dir_file.disk->bpb.BPB_BytsPerSec * parent_dir.dir_file.disk->bpb.BPB_SecPerClus;
+
+	// Find the first free entry in the directory
+	while (1){
+		if (dir_offset + sizeof(fat_dir_entry) > parent_dir.dir_file.fat_dir.DIR_FileSize) {
+			// The directory is full, increase the size of the directory with new zeroed entries
+			fat_fseek(&parent_dir.dir_file, dir_offset + sizeof(fat_dir_entry), fat_SEEK_SET);
+			for (int i = 0; i < sizeof(fat_dir_entry); i++) {
+				((unsigned char*)&helper_dir_entry)[i] = 0;
+			}
+
+			if (!fat_fwrite((unsigned char*)&helper_dir_entry, sizeof(fat_dir_entry), 1, &parent_dir.dir_file)) {
+				// Could not increase the size of the directory
+				return 0;
+			}
+		}
+
+		fat_fseek(&parent_dir.dir_file, dir_offset, fat_SEEK_SET);
+		fat_fread((unsigned char*)&helper_dir_entry, sizeof(fat_dir_entry), 1, &parent_dir.dir_file);			
+
+		if (helper_dir_entry.DIR_Name[0] == 0x00 || helper_dir_entry.DIR_Name[0] == 0xE5) {
+			found_contiguous_entries++;
+			if (found_contiguous_entries >= required_entries) {
+				break;
+			}
+		}
+		else {
+			found_contiguous_entries = 0;
+		}
+
+		dir_offset += sizeof(fat_dir_entry);
+	}
+
+	// Save the entry position
+	new_file_out->entry_position = dir_offset;
+	new_file_out->first_parent_cluster = parent_dir.dir_file.fat_dir.DIR_FstClusLO + (parent_dir.dir_file.fat_dir.DIR_FstClusHI << 16);
+
+	// Allocate a new cluster for the file
+	unsigned int disk_size = (parent_dir.dir_file.disk->bpb.BPB_TotSec32 == 0) ? parent_dir.dir_file.disk->bpb.BPB_TotSec16 : parent_dir.dir_file.disk->bpb.BPB_TotSec32;
+	unsigned int free_cluster = 2;
+	while (fat_read_fat_entry(parent_dir.dir_file.disk, free_cluster) != 0x0) {
+		free_cluster++;
+		if (free_cluster * parent_dir.dir_file.disk->bpb.BPB_SecPerClus >= disk_size) {
+			// No free clusters
+			return 0;
+		}
+	}
+
+	new_file_out->fat_dir.DIR_FstClusLO = free_cluster;
+	new_file_out->fat_dir.DIR_FstClusHI = free_cluster >> 16;
+	
+	fat_write_fat_entry(parent_dir.dir_file.disk, free_cluster, 0x0FFFFFFF);
+
+	// Update the parent directory with the new entry
+	fat_update_entry(new_file_out);
+	fat_update_lfn(new_file_out, 0);
+
+	return 1;
+}
+
+int fat_fopen(fat_FILE* file_out, fat_DIR* root_dir, const char* path, const char* mode) {
+	fat_DIR helper_dir;
+	int find_success = fat_find(&helper_dir, file_out, root_dir, path, 1, 0);
+
+	int success = 0;
+	if (mode[0] == 'r') {
+		success = (find_success == fat_FOUND_FILE) ? 1 : 0;
+	}
+	else if (mode[0] == 'w' || mode[0] == 'a') {
+		if (find_success == fat_FOUND_FILE) {
+			if (mode[0] == 'w') {
+				// File exists, truncate it
+				file_out->fat_dir.DIR_FileSize = 0;
+				fat_update_entry(file_out);
+				fat_remove_fat_chain(file_out);
+				fat_write_fat_entry(file_out->disk, file_out->fat_dir.DIR_FstClusLO, 0x0FFFFFFF);
+				success = 1;
+			}
+			else if (mode[0] == 'a') {
+				// Seek to the end of the file
+				fat_fseek(file_out, 0, fat_SEEK_END);
+				success = 1;
+			}
+		}
+		else if (find_success == fat_NOT_FOUND) {
+			// File does not exist, create it
+			success = fat_create(file_out, root_dir, path);
+		}
+	}
 	return success;
 }
 
@@ -529,35 +1019,44 @@ int fat_init(fat_DISK* disk, fat_disk_access_func_t read_func, fat_disk_access_f
 	}
 
 	// Read the root directory
-	disk->root_directory.disk = disk;
-	disk->root_directory.fat_dir.DIR_FstClusLO = (disk->bpb.BPB_RootClus == 0) ? 2 : disk->bpb.BPB_RootClus;
-	disk->root_directory.fat_dir.DIR_FileSize = -1;
-	disk->root_directory.cursor = 0;
-	disk->root_directory.long_filename[0] = '\0';
+	fat_file_default(&disk->root_directory.dir_file, disk);
+	disk->root_directory.dir_file.fat_dir.DIR_FstClusLO = (disk->bpb.BPB_RootClus == 0) ? 2 : disk->bpb.BPB_RootClus;
+	disk->root_directory.dir_file.fat_dir.DIR_FileSize = -1;
+
+	unsigned int first_fat_sector = disk->bpb.BPB_RsvdSecCnt;
+	unsigned int first_data_sector = first_fat_sector + (disk->bpb.BPB_NumFATs * disk->bpb.BPB_FATSz32);
+	disk->root_directory.dir_file.entry_position = first_data_sector * disk->bpb.BPB_BytsPerSec;
 
 	return 1;
 }
 
 /* public helper functions */
 
-void fat_longname_to_string(const char* buffer_long, char* buffer_string) {
+int fat_longname_to_string(const unsigned short* buffer_long, char* buffer_string) {
 	// long filename is in unicode, convert to ascii
 	int i = 0;
-	while (buffer_long[i * 2] != 0) {
-		buffer_string[i] = buffer_long[i * 2];
+	while (buffer_long[i] != 0) {
+		buffer_string[i] = (char)buffer_long[i];
 		i++;
 	}
 	buffer_string[i] = 0;
+
+	return i;
 }
 
+int fat_string_to_longname(const char* buffer_string, unsigned short* buffer_long) {
+	int i = 0;
+	while (buffer_string[i] != 0) {
+		buffer_long[i] = buffer_string[i];
+		i++;
+	}
+	buffer_long[i] = 0;
+
+	return i;
+}
 
 void fat_copy_DIR(fat_DIR* to, fat_DIR* from) {
-	to->cursor = from->cursor;
-	to->disk = from->disk;
-	to->fat_dir = from->fat_dir;
-	for (int i = 0; i < 260 * 2; i++) {
-		to->long_filename[i] = from->long_filename[i];
-	}
+	*to = *from;
 }
 
 void fat_print_buffer(const unsigned char* buffer, int size) {
@@ -653,8 +1152,8 @@ void fat_print_dir(fat_dir_entry* dir) {
 	kprintf("DIR_FileSize: %d\n", (unsigned int)dir->DIR_FileSize);
 }
 
-void fat_print_longname(const char* longname) {
-	for (int i = 0; i < 260 * 2; i += 2) {
+void fat_print_longname(const unsigned short* longname) {
+	for (int i = 0; i < 260; i++) {
 		if (longname[i] == 0x00) {
 			break;
 		}

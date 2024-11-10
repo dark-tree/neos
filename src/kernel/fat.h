@@ -80,22 +80,37 @@ typedef struct fat_dir_entry_s {
 } fat_dir_entry;
 #pragma pack()
 
+#pragma pack(1)
+typedef struct fat_lfn_entry_s {
+	unsigned char LDIR_Ord;
+	unsigned short LDIR_Name1[5];
+	unsigned char LDIR_Attr;		// Always 0x0F
+	unsigned char LDIR_Type;		// Always 0x00
+	unsigned char LDIR_Chksum;
+	unsigned short LDIR_Name2[6];
+	unsigned short LDIR_FstClusLO;	// Always 0x00
+	unsigned short LDIR_Name3[2];
+} fat_lfn_entry;
+#pragma pack()
+
 // forward declaration
 typedef struct fat_DISK_s fat_DISK;
 
 typedef struct fat_FILE_s {
-	fat_dir_entry fat_dir;
+	union {
+		fat_dir_entry fat_dir;
+		fat_lfn_entry fat_lfn;
+	};
 	unsigned int entry_position;
+	unsigned int first_parent_cluster;
+	unsigned int lfn_present;
 	fat_DISK* disk;
 	unsigned int cursor;
-	unsigned char long_filename[260 * 2];
+	unsigned short long_filename[260];
 } fat_FILE;
 
 typedef struct fat_DIR_s {
-	fat_dir_entry fat_dir;
-	fat_DISK* disk;
-	unsigned int cursor;
-	unsigned char long_filename[260 * 2];
+	fat_FILE dir_file;
 } fat_DIR;
 
 typedef struct fat_DISK_s {
@@ -182,15 +197,41 @@ int fat_readdir(fat_DIR* dir_out, fat_FILE* file_out, fat_DIR* parent_dir);
 int fat_opendir(fat_DIR* subdir_out, fat_DIR* root_dir, const char* path);
 
 /**
+ * @brief Remove the file at the given path
+ * 
+ * @param root_dir root directory from which the path starts
+ * @param path path to the file relative to the root_dir
+ * @param is_file 1 if the path is a file, 0 if the path is a directory
+ * 
+ * @return 1 if the file was removed, 0 if the file was not removed
+*/
+unsigned char fat_remove(fat_DIR* root_dir, const char* path, unsigned char is_file);
+
+/**
+ * @brief Create the file at the given path
+ * 
+ * @param new_file_out valid file if created
+ * @param root_dir root directory from which the path starts
+ * @param path path to the file relative to the root_dir
+ * 
+ * @return 1 if the file was created, 0 if the file was not created
+*/
+int fat_create(fat_FILE* new_file_out, fat_DIR* root_dir, const char* path);
+
+/**
  * @brief Open the file at the given path
  * 
  * @param file_out valid file if found
  * @param root_dir root directory from which to open the file
  * @param path path to the file
+ * @param mode mode to open the file in. Possible values are:
+ * 				"r" - read and write to existing file,
+ * 				"w" - read and write to file, truncate if file exists, create if file does not exist,
+ * 				"a" - read and write to file, seek to the end of the file, create if file does not exist
  * 
  * @return 1 if the file was opened, 0 if the file was not found
 */
-int fat_fopen(fat_FILE* file_out, fat_DIR* root_dir, const char* path);
+int fat_fopen(fat_FILE* file_out, fat_DIR* root_dir, const char* path, const char* mode);
 
 /**
  * @brief Initialize the FAT disk
@@ -212,9 +253,19 @@ int fat_init(fat_DISK* disk, fat_disk_access_func_t read_func, fat_disk_access_f
  * @param buffer_long input long filename in unicode
  * @param buffer_string output long filename in ascii
  * 
- * @return None
+ * @return Number of characters in the long filename
 */
-void fat_longname_to_string(const char* buffer_long, char* buffer_string);
+int fat_longname_to_string(const unsigned short* buffer_long, char* buffer_string);
+
+/**
+ * @brief Convert long filename stored in ascii to unicode
+ * 
+ * @param buffer_string input long filename in ascii
+ * @param buffer_long output long filename in unicode
+ * 
+ * @return Number of characters in the long filename
+*/
+int fat_string_to_longname(const char* buffer_string, unsigned short* buffer_long);
 
 /**
  * @brief Create copy of the directory
@@ -279,5 +330,5 @@ void fat_print_dir(fat_dir_entry* dir);
  * 
  * @return None
 */
-void fat_print_longname(const char* longname);
+void fat_print_longname(const unsigned short* longname);
 

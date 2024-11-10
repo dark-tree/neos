@@ -262,11 +262,6 @@ static bool floppy_reset(){
     // enable controller, select drive 1
     outb(DIGITAL_OUTPUT_REGISTER, RESET | DRIVE1_MOTOR | DRIVE1);
 
-    // wait for a while
-    for(uint32_t i = 0; i < 0xfffffff; i++){
-        __asm__ volatile ("nop");
-    }
-
     // sense interrupt 4 times
     for(uint8_t i = 0; i < 4; i++){
         floppy_send_command(SENSE_INTERRUPT);

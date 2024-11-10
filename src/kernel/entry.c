@@ -24,12 +24,17 @@ void start() {
 
 		fat_DISK disk;
 		if (fat_init(&disk, read_func, write_func, 0)) {
+			if(fat_remove(&disk.root_directory, "files/mainlongfilename.c", 1)){
+				kprintf("File removed\n");
+			}
+			else{
+				kprintf("Error: Failed to remove file\n");
+			}
 
 			fat_FILE file;
-			if(fat_fopen(&file, &disk.root_directory, "files/readme.txt")){
-
+			if(fat_fopen(&file, &disk.root_directory, "files/mainlongfilename2.c", "a")){
+				
 				// Write to the file
-				fat_fseek(&file, 0, fat_SEEK_END);
 				fat_fwrite("Hello, World!\n", 1, 14, &file);
 
 				// Read the file
