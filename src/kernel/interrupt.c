@@ -60,7 +60,7 @@ void int_wait() {
 extern int_go_bonkers();
 
 void int_gone_bonkers() {
-	kprintf("Gone %s!\n", "Bonkers");
+	panic("Just a test, panic() called from int_gone_bonkers()");
 	halt();
 }
 

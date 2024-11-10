@@ -32,6 +32,7 @@ void start() {
 	asm_test();
 
 	// never return to the bootloader
+	panic("Return from kernel forbidden!");
 	halt();
 
 }

@@ -4,6 +4,7 @@
 #include "config.h"
 #include "math.h"
 #include "memory.h"
+#include "util.h"
 
 /* private */
 
@@ -77,21 +78,14 @@ void kprint_integer(PrintState* state, long integer, int base) {
 		}
 
 		if (base == 8) {
-			i -= 2;
 			con_write('0');
 			con_write('o');
 		}
 
 		if (base == 2) {
-			i -= 2;
 			con_write('0');
 			con_write('b');
 		}
-	}
-
-	if (integer == 0) {
-		con_write('0');
-		return;
 	}
 
 	while (uint && i) {

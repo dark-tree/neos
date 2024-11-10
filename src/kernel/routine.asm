@@ -376,7 +376,6 @@ section .data
 temp_stack:
 	times 4096 db 0
 
-
 service_table:
 	times 256 dd 0
 
