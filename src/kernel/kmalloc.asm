@@ -2,8 +2,7 @@
 cpu 386
 bits 32
 
-%define KMALLOC_BLOCK_SIZE 256
-%define CONTROL_STRUCTURE_BYTES_PER_BLOCK 8
+%define KMALLOC_BLOCK_SIZE 1024
 
 section .text
 
@@ -747,14 +746,6 @@ push EDI
 	add EAX, [offset]
 	mov [tree_levels+4], EAX
 
-	;First, we need to calculate how many leaves the tree will have - this will be a power of 2, larger or equal than number of blocks
-	mov ECX, 1
-	mov EDX, [block_number]
-	it_ptl1:
-		shl ECX, 1
-	cmp ECX, EDX
-	jb it_ptl1
-	mov [tree_levels], ECX	;We save the number of nodes, that the first tree level will have
 
 
 	;Initialiing the entire tree with 0s (marking them as unallocated)
@@ -771,8 +762,6 @@ push EDI
 
 	pop EDX
 
-
-	push ECX
 
 	mov EDI, [tree_levels]	;Size of the array represening level 0
 	shr EDI, 3 	;On level 0 each node has 1 bit, so we divide by 8 to get total array size
@@ -818,10 +807,21 @@ push EDI
 	jne it_ptl3
 
 
-	pop ECX
-
 	;We initialize last X nodes in the lowest tree level with 1s (that's because those represent non-existent blocks, so we mark them as allocated from the start)
-	mov EAX, [block_number]
+	mov EAX, [end]
+
+	push EDX
+	push EBX
+
+	mov EDX, 0
+	mov EBX, KMALLOC_BLOCK_SIZE
+	div EBX	;Calculating how many free segments there will be, after taking into account size od the control structure
+
+	pop EDX
+	pop EBX
+
+	mov ECX, [tree_levels]
+
 	cmp EAX, ECX
 	jae skip_it_ptl2
 	it_ptl2:
@@ -877,23 +877,34 @@ kset:
 push EBP
 mov EBP, ESP
 push EBX
+
+	mov EAX, [EBP+12]
+	mov [offset], EAX
+
 	mov EAX, [EBP+8]
 	mov [size], EAX		;Save area size
 
 	mov EBX, KMALLOC_BLOCK_SIZE
-	add EBX, CONTROL_STRUCTURE_BYTES_PER_BLOCK	;Adding, to take into account X bytes of control structure per block
 	mov EDX, 0
 	div EBX	;Calculating how many blocks fit into memory
 	mov [block_number], EAX
-	mov EBX, CONTROL_STRUCTURE_BYTES_PER_BLOCK
-	mov EDX, 0
-	mul EBX
-	mov EBX, [size]	;Calculating the size of the control structure
-	sub EBX, EAX	;Calculating offset of the control structure0x8
-	mov [end], EBX		;At the end of the managed domain there will be information about reserved blocks stored, this number represents where it starts.
-	mov EAX, [EBP+12]
-	mov [offset], EAX	;Save area offset
 
+	;We need to calculate how many leaves the tree will have - this will be a power of 2, larger or equal than number of blocks
+	mov ECX, 1
+	mov EDX, [block_number]
+	it_ptl1:
+		shl ECX, 1
+	cmp ECX, EDX
+	jb it_ptl1
+	mov [tree_levels], ECX	;We save the number of nodes, that the first tree level will have
+
+	sub ECX, 1
+	shr ECX, 1	;Calculating size od the control structute (4 bits per segment/block, so we divide the number of segments in 2)
+	add ECX, 1
+
+	mov EAX, [size]
+	sub EAX, ECX
+	mov [end], EAX
 
 	;Initializing the tree (this function is taking parameters from this global variables)
 	call kinternal_initializetree
