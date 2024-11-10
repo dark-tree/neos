@@ -31,6 +31,7 @@ static bool invert;
 static uint8_t attribute;
 static int width, height;
 static int x, y;
+static bool shortcuts;
 
 // saved state
 static uint8_t sa;
@@ -376,7 +377,7 @@ static void con_lexer_initial(char code) {
 		return;
 	}
 
-	if (code == ANSI_ESC_CSI) {
+	if (shortcuts && (code == ANSI_ESC_CSI)) {
 		length = 0;
 		memset(sequence, 0, CONSOLE_MAX_ANSI_SEQUENCE);
 		sequence[length ++] = ANSI_CSI;
@@ -385,7 +386,7 @@ static void con_lexer_initial(char code) {
 		return;
 	}
 
-	if (code == ANSI_ESC_DCS || code == ANSI_ESC_OCS) {
+	if (shortcuts && (code == ANSI_ESC_DCS || code == ANSI_ESC_OSC)) {
 		length = 0;
 		memset(sequence, 0, CONSOLE_MAX_ANSI_SEQUENCE);
 		sequence[length ++] = ANSI_CSI;
@@ -432,6 +433,18 @@ static void con_lexer_escape(char code) {
 
 	if (code == ANSI_OSC || code == ANSI_SOS || code == ANSI_PM || code == ANSI_APC || code == ANSI_DCS) {
 		output_lexer = con_lexer_until_st;
+		return;
+	}
+
+	if (code == ANSI_NEOEM) {
+		shortcuts = false;
+		output_lexer = con_lexer_initial;
+		return;
+	}
+
+	if (code == ANSI_NEOAM) {
+		shortcuts = true;
+		output_lexer = con_lexer_initial;
 		return;
 	}
 
@@ -499,6 +512,7 @@ void con_init(int max_width, int max_height) {
 	output_lexer = con_lexer_initial;
 	length = 0;
 	invert = false;
+	shortcuts = true;
 
 	sa = attribute;
 	sx = 0;

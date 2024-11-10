@@ -17,6 +17,7 @@
  *        %b        | Signed binary integer      | 110100100
  *        %c        | Single character           | a
  *        %s        | Null-terminated string     | Hello!
+ *        %S        | Print wide, utf-16 string  | World!
  *        %%        | A literal '%' character    | %
  *
  *        Modifier  | Effect

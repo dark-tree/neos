@@ -113,6 +113,7 @@ dump:
 
 asm_test:
 
+	; This invokes the switch-stack interrupt
 	int 0x01
 	call halt
 
