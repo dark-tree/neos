@@ -20,7 +20,7 @@ extern void kfree(void* pointer);
 
 void start() {
 
-	kset(1024*1024*32, 1024*1024);
+	kset(1024*1024*31, 1024*1024);
 
 	con_init(80, 25);
 	kprintf("\e[2J");
@@ -30,9 +30,14 @@ void start() {
 	}
 	kprintf("\n\n");
 
-	
-	
-	kprintf("%d", *((uint8_t*)1074266112+3));
+
+	kprintf("%b %b", *((uint8_t*)testtreepointer(0)), *((uint8_t*)(testtreepointer(0)+1)));
+	kprintf("\n%b %b", *((uint8_t*)testtreepointer(1)), *((uint8_t*)(testtreepointer(1)+1)));
+	kprintf("\n%b %b", *((uint8_t*)testtreepointer(2)), *((uint8_t*)(testtreepointer(2)+1)));
+	kprintf("\n%b", *((uint8_t*)testtreepointer(3)));
+	kprintf("\n%b", *((uint8_t*)testtreepointer(4)));
+	kprintf("\n\n");
+
 	//kinternal_settreeelement(1, 7, 0b00);
 	//kinternal_settreeelement(1, 7, 0b11);
 	//kinternal_buddify(1, 7);

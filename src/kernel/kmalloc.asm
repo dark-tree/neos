@@ -625,6 +625,104 @@ pop EBP
 ret
 
 
+;Function applies buddify to multiple nodes on the same tree level
+;Takes 3 arguments: (uint32_t tree_level, uint32_t start_node, uint32_t end_node) It will run buddify on every node from start_node to end_node (including those two)
+kinternal_levelbuddify:
+mov EDX, ESP
+push EBP
+push EBX
+push ESI
+push EDI
+	mov EBP, [EDX+4]	;Tree level, that we will be running this operation on is stored to EBP
+	
+	mov ESI, [EDX+8]
+	mov EDI, [EDX+12]	;Start and end point
+
+	lb_ptl1:
+		push ESI
+		push EBP
+		call kinternal_buddify
+		add ESP, 8	;We are not restoring EAX, EDX and ECX, because we do not need those registers
+		add ESI, 1	;Moving to the next node
+	cmp ESI, EDI
+	jbe lb_ptl1
+
+pop EDI
+pop ESI
+pop EBX
+pop EBP
+ret
+
+
+;This function calls full_buddify on a number of nodes in a time-effective manner.
+;Takes 3 arguments: (uint32_t tree_level, uint32_t start_node, uint32_t end_node) It will run full_buddify on every node from start_node to end_node (including those two)
+
+kinternal_areafull_buddify:
+mov EDX, ESP
+push EBP
+push EBX
+push ESI
+push EDI
+	mov EBP, [EDX+4]	;Starting level (we will be incrementing this to move up the tree
+	mov ESI, [EDX+8]
+	mov EDI, [EDX+12]	;Starting and ending points
+
+	mov EBX, [max_tree_level] ;Highest tree level - that's where we end
+
+	afb_ptl1:
+		;We start buddify from the level above:
+		add EBP, 1 ;Moving level up
+		shr ESI, 1	;Getting parent of the starting point node
+		shr EDI, 1	;Getting parent of the ending point node
+
+		push EDI	;Starting node number of this level
+		push ESI	;Ending node number on this level
+		push EBP	;Current level number
+		call kinternal_levelbuddify
+		add ESP, 12
+
+	cmp EBP, EBX
+	jbe afb_ptl1 
+pop EDI
+pop ESI
+pop EBX
+pop EBP
+ret
+
+
+;This function sets multiple tree elements on a given level to the given value. 
+;It takes 4 arguments: (uint32_t tree_level, uint32_t starting_node, uint32_t ending node, uint32_t value)
+kinternal_areasettreeelement:
+mov EDX, ESP
+push EBP
+push EBX
+push ESI
+push EDI
+	mov EBP, [EDX+4]	;Tree level
+	mov EBX, [EDX+16]	;Node value
+	mov ESI, [EDX+8]	;Start node
+	mov EDI, [EDX+12] 	;End node
+
+	aste_ptl1:
+		push EBX
+		push ESI
+		push EBP
+		call kinternal_settreeelement
+		add ESP, 12
+
+		add ESI, 1	;Moving to the next node 
+	cmp ESI, EDI
+	jbe aste_ptl1
+
+pop EDI
+pop ESI
+pop EBX
+pop EBP
+ret
+
+
+
+
 ;Function takes 3 arguments: (uint32_t tree_level, uint32_t node_number, uint32_t new_value)
 ;Note: only tree_level+1 youngest bits from the new_value will be used
 kinternal_settreeelement:
@@ -821,43 +919,33 @@ push EDI
 	pop EBX
 
 	mov ECX, [tree_levels]
+	sub ECX, 1
 
 	cmp EAX, ECX
-	jae skip_it_ptl2
-	it_ptl2:
-		push EAX
-		push EDX
-		push ECX
+	ja it_skiponesetting
 
-		push DWORD 1	;Setting node to 1
-		push EAX	;Node number EAX
-		push DWORD 0	;On tree level 0
-		call kinternal_settreeelement
-		add ESP, 12
+	push EAX
+	push ECX
+	push EDX
 
-		pop ECX
-		pop EDX
-		pop EAX
+	push DWORD 1
+	push ECX
+	push EAX
+	push DWORD 0
+	call kinternal_areasettreeelement
+	add ESP, 16
 
+	pop EDX
+	pop ECX
+	pop EAX
 
-		push EAX
-		push EDX
-		push ECX
+	push DWORD ECX
+	push DWORD EAX
+	push DWORD 0
+	call kinternal_areafull_buddify
+	add ESP, 12
 
-		push EAX	;Calling full buddify on the node we just set to 1
-		push DWORD 0	;...on level 0
-		call kinternal_full_buddify
-		add ESP, 8
-
-		pop ECX
-		pop EDX
-		pop EAX
-
-	add EAX, 1
-	cmp EAX, ECX
-	jb it_ptl2
-
-	skip_it_ptl2:
+	it_skiponesetting:
 
 
 pop EDI
