@@ -201,7 +201,9 @@ static void kprint_integer(PrintState* state, long integer, int base) {
 		}
 	}
 
-	while (uint && i) {
+	if (uint == 0) {
+		buffer[i--] = '0';
+	} else while (uint && i) {
 		long rem = uint % base;
 		buffer[i--] = digits[rem];
 		uint /= base;
