@@ -9,7 +9,8 @@ KERNEL_AS = \
 	build/kernel/tables.o \
 	build/kernel/routine.o \
 	build/kernel/pic.o \
-	build/kernel/util.o
+	build/kernel/util.o \
+	build/kernel/cursor.o
 
 # Kernel C object files
 KERNEL_CC = \

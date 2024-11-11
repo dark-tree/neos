@@ -4,6 +4,7 @@
 #include "print.h"
 #include "interrupt.h"
 #include "util.h"
+#include "cursor.h"
 
 extern char asm_test();
 extern void pic_disable();
@@ -13,6 +14,7 @@ extern void pic_disable();
 
 void start() {
 	con_init(80, 25);
+	cur_enable();
 
 	kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m%#0.8x\e[m again!\n", "sweet", 'r', -1920);
 
