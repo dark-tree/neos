@@ -17,9 +17,9 @@ static int locked;
 // You can use this handle to debug the incoming interrupts
 static void int_debug_handle(int number, int error, int* eax, int ecx, int edx, int ebx, int esi, int edi) {
 	kprintf("Interrupt: 0x%x (%s), err=%d\n", number, isr_name(number), error);
-	kprintf(" * EAX=0x%x, EBX=0x%x\n", *eax, ebx);
-	kprintf(" * ECX=0x%x, EDX=0x%x\n", ecx, edx);
-	kprintf(" * ESI=0x%x, EDI=0x%x\n", esi, edi);
+	kprintf(" * EAX=%x, EBX=%x\n", *eax, ebx);
+	kprintf(" * ECX=%x, EDX=%x\n", ecx, edx);
+	kprintf(" * ESI=%x, EDI=%x\n", esi, edi);
 }
 
 // Forward syscalls to the syscall system

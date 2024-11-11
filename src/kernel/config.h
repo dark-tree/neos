@@ -28,3 +28,9 @@
  *        Refer to the x86 memory map when modifying this value.
  */
 #define MEMORY_MAP_IDT 0x0
+
+/**
+ * @brief The physical address of the Memory Map, as constructed by the
+ *        bootloader. Refere to the BIOS Function INT 0x15, EAX = 0xE820
+ */
+#define MEMORY_MAP_RAM 0x500
