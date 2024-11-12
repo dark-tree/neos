@@ -31,8 +31,16 @@ void start() {
 				kprintf("Error: Failed to remove file\n");
 			}
 
+			fat_DIR dir;
+			if (fat_create_dir(&dir, &disk.root_directory, "files/test", 0)) {
+				kprintf("Directory created\n");
+			}
+			else{
+				kprintf("Error: Failed to create directory\n");
+			}
+
 			fat_FILE file;
-			if(fat_fopen(&file, &disk.root_directory, "files/mainlongfilename2.c", "a")){
+			if(fat_fopen(&file, &disk.root_directory, "files/test/mainlongfilename8.c", "a")){
 				
 				// Write to the file
 				fat_fwrite("Hello, World!\n", 1, 14, &file);

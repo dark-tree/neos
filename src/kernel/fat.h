@@ -23,6 +23,13 @@ typedef void(*fat_disk_access_func_t)(unsigned char* data, unsigned int offset_i
 #define fat_SEEK_CUR 1
 #define fat_SEEK_END 2
 
+#define fat_ATTR_READ_ONLY 0x01
+#define fat_ATTR_HIDDEN 0x02
+#define fat_ATTR_SYSTEM 0x04
+#define fat_ATTR_VOLUME_ID 0x08
+#define fat_ATTR_DIRECTORY 0x10
+#define fat_ATTR_ARCHIVE 0x20
+
 #pragma pack(1)
 typedef struct fat_bpb_s {
 	/*
@@ -213,10 +220,23 @@ unsigned char fat_remove(fat_DIR* root_dir, const char* path, unsigned char is_f
  * @param new_file_out valid file if created
  * @param root_dir root directory from which the path starts
  * @param path path to the file relative to the root_dir
+ * @param attributes file attributes (fat_ATTR_HIDDEN, fat_ATTR_READ_ONLY)
  * 
  * @return 1 if the file was created, 0 if the file was not created
 */
-int fat_create(fat_FILE* new_file_out, fat_DIR* root_dir, const char* path);
+int fat_create_file(fat_FILE* new_file_out, fat_DIR* root_dir, const char* path, unsigned char attributes);
+
+/**
+ * @brief Create the directory at the given path
+ * 
+ * @param new_dir_out valid directory if created
+ * @param root_dir root directory from which the path starts
+ * @param path path to the directory relative to the root_dir
+ * @param attributes directory attributes (fat_ATTR_HIDDEN, fat_ATTR_READ_ONLY)
+ * 
+ * @return 1 if the directory was created, 0 if the directory was not created
+*/
+int fat_create_dir(fat_DIR* new_dir_out, fat_DIR* root_dir, const char* path, unsigned char attributes);
 
 /**
  * @brief Open the file at the given path

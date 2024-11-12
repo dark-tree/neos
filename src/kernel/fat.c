@@ -307,6 +307,19 @@ static void fat_read_entry(fat_FILE* dir) {
 	fat_fread((unsigned char*)&dir->fat_dir, sizeof(fat_dir_entry), 1, &parent_dir.dir_file);
 }
 
+static void fat_clear_cluster(fat_DISK* disk, unsigned int cluster) {
+	unsigned int first_data_sector = disk->bpb.BPB_RsvdSecCnt + (disk->bpb.BPB_NumFATs * disk->bpb.BPB_FATSz32);
+	unsigned int cluster_offset = first_data_sector + (cluster - 2) * disk->bpb.BPB_SecPerClus;
+	unsigned int cluster_size_bytes = disk->bpb.BPB_SecPerClus * disk->bpb.BPB_BytsPerSec;
+	unsigned char clear_buffer[cluster_size_bytes];
+
+	for (unsigned int i = 0; i < cluster_size_bytes; i++) {
+		clear_buffer[i] = 0;
+	}
+
+	disk->write_func(clear_buffer, cluster_offset * disk->bpb.BPB_BytsPerSec, cluster_size_bytes, disk->user_args);
+}
+
 unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int element_count, fat_FILE* file) {
 	fat_dir_entry* file_dir = &file->fat_dir;
 
@@ -334,8 +347,14 @@ unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int 
 		}
 
 		if (next_cluster == 0x0 || (next_cluster >= 0x0FFFFFF8 && next_cluster <= 0x0FFFFFFF)) {
+			unsigned char new_end = 1;
+
 			// Cluster is free, allocate a new cluster or if it is the last cluster, check if the data fits
 			if (file->cursor + data_size <= cluster_write_data_offset + cluster_size) {
+				if (next_cluster == 0x0FFFFFFF) {
+					new_end = 0;
+				}
+				
 				// Set the current cluster as the last cluster
 				next_cluster = 0x0FFFFFFF;
 			}
@@ -355,7 +374,12 @@ unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int 
 				next_cluster = free_cluster;
 			}
 
-			fat_write_fat_entry(file->disk, current_file_cluster, next_cluster);
+			if (new_end){
+				fat_write_fat_entry(file->disk, current_file_cluster, next_cluster);
+
+				// Clear the new cluster
+				fat_clear_cluster(file->disk, next_cluster);
+			}
 		}
 
 		unsigned int cluster_offset = first_data_sector + (current_file_cluster - 2) * file->disk->bpb.BPB_SecPerClus;
@@ -766,7 +790,7 @@ unsigned char fat_remove(fat_DIR* root_dir, const char* path, unsigned char is_f
 	return 0;
 }
 
-int fat_create(fat_FILE* new_file_out, fat_DIR* root_dir, const char* path) {
+int fat_create(fat_FILE* new_file_out, fat_DIR* root_dir, const char* path, unsigned char attributes) {
 	// Find the parent directory
 	unsigned int path_length = 0;
 	while (path[path_length] != '\0') {
@@ -797,7 +821,7 @@ int fat_create(fat_FILE* new_file_out, fat_DIR* root_dir, const char* path) {
 
 	// Initialize the new file
 	fat_file_default(new_file_out, parent_dir.dir_file.disk);
-	new_file_out->fat_dir.DIR_Attr = 0x20;
+	new_file_out->fat_dir.DIR_Attr = attributes;
 
 	/* File name */
 
@@ -954,10 +978,72 @@ int fat_create(fat_FILE* new_file_out, fat_DIR* root_dir, const char* path) {
 	new_file_out->fat_dir.DIR_FstClusHI = free_cluster >> 16;
 	
 	fat_write_fat_entry(parent_dir.dir_file.disk, free_cluster, 0x0FFFFFFF);
+	fat_clear_cluster(parent_dir.dir_file.disk, free_cluster);
 
 	// Update the parent directory with the new entry
 	fat_update_entry(new_file_out);
 	fat_update_lfn(new_file_out, 0);
+
+	return 1;
+}
+
+int fat_create_file(fat_FILE* new_file_out, fat_DIR* root_dir, const char* path, unsigned char attributes){
+	fat_DIR dummy_dir;
+	if (fat_find(&dummy_dir, new_file_out, root_dir, path, 1, 0) != fat_NOT_FOUND) {
+		return 0;
+	}
+	return fat_create(new_file_out, root_dir, path, fat_ATTR_ARCHIVE | attributes);
+}
+
+int fat_create_dir(fat_DIR* new_dir_out, fat_DIR* root_dir, const char* path, unsigned char attributes) {
+	// Check if the directory already exists
+	if (fat_find(new_dir_out, NULL, root_dir, path, 0, 0) != fat_NOT_FOUND) {
+		return 0;
+	}
+
+	// Create the directory
+	if(!fat_create(&new_dir_out->dir_file, root_dir, path, fat_ATTR_DIRECTORY | attributes)){
+		return 0;
+	}
+
+	// Create . and .. entries
+	fat_DIR parent_dir;
+	fat_file_default(&parent_dir.dir_file, new_dir_out->dir_file.disk);
+	parent_dir.dir_file.fat_dir.DIR_FstClusLO = new_dir_out->dir_file.first_parent_cluster;
+	parent_dir.dir_file.fat_dir.DIR_FstClusHI = new_dir_out->dir_file.first_parent_cluster >> 16;
+	parent_dir.dir_file.fat_dir.DIR_FileSize = fat_file_cluster_count(&parent_dir.dir_file) * parent_dir.dir_file.disk->bpb.BPB_SecPerClus * parent_dir.dir_file.disk->bpb.BPB_BytsPerSec;
+
+	fat_dir_entry entry;
+	for (int i = 0; i < sizeof(fat_dir_entry); i++) {
+		((unsigned char*)&entry)[i] = 0;
+	}
+	for (int i = 0; i < 11; i++) {
+		entry.DIR_Name[i] = ' ';
+	}
+
+	// .
+	entry.DIR_Name[0] = '.';
+	entry.DIR_Attr = fat_ATTR_DIRECTORY;
+	entry.DIR_FstClusLO = new_dir_out->dir_file.fat_dir.DIR_FstClusLO;
+	entry.DIR_FstClusHI = new_dir_out->dir_file.fat_dir.DIR_FstClusHI;
+	entry.DIR_FileSize = 0;
+
+	fat_fseek(&new_dir_out->dir_file, 0, fat_SEEK_SET);
+	if (!fat_fwrite((unsigned char*)&entry, sizeof(fat_dir_entry), 1, &new_dir_out->dir_file)) {
+		return 0;
+	}
+
+	// ..
+	entry.DIR_Name[1] = '.';
+	entry.DIR_Attr = fat_ATTR_DIRECTORY;
+	entry.DIR_FstClusLO = parent_dir.dir_file.fat_dir.DIR_FstClusLO;
+	entry.DIR_FstClusHI = parent_dir.dir_file.fat_dir.DIR_FstClusHI;
+	entry.DIR_FileSize = 0;
+
+	fat_fseek(&new_dir_out->dir_file, sizeof(fat_dir_entry), fat_SEEK_SET);
+	if (!fat_fwrite((unsigned char*)&entry, sizeof(fat_dir_entry), 1, &new_dir_out->dir_file)) {
+		return 0;
+	}
 
 	return 1;
 }
@@ -988,7 +1074,7 @@ int fat_fopen(fat_FILE* file_out, fat_DIR* root_dir, const char* path, const cha
 		}
 		else if (find_success == fat_NOT_FOUND) {
 			// File does not exist, create it
-			success = fat_create(file_out, root_dir, path);
+			success = fat_create_file(file_out, root_dir, path, 0);
 		}
 	}
 	return success;
