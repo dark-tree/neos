@@ -528,6 +528,8 @@ void con_init(int max_width, int max_height) {
 	sa = attribute;
 	sx = 0;
 	sy = 0;
+
+	con_erase(0, 0, width - 1, height - 1);
 }
 
 void con_scroll(int offset) {

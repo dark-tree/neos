@@ -20,7 +20,8 @@ KERNEL_CC = \
 	build/kernel/memory.o \
 	build/kernel/math.o \
 	build/kernel/interrupt.o \
-	build/kernel/syscall.o
+	build/kernel/syscall.o \
+	build/kernel/mem.o
 
 # Configuration
 CC_FLAGS = -nostdinc -fomit-frame-pointer -fno-builtin -nodefaultlibs -nostdlib -ffreestanding
