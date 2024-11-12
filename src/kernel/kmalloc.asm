@@ -44,13 +44,13 @@ push EDI
 	push EDI
 	push ESI
 	push DWORD 0
-	call kinternal_areasettreeelement	;Marking segments as allocated
+	call areasettreeelement	;Marking segments as allocated
 	add ESP, 16
 
 	push EDI
 	push ESI
 	push DWORD 0
-	call kinternal_areafull_buddify	;Propagating the change up the tree using buddify
+	call areafull_buddify	;Propagating the change up the tree using buddify
 	add ESP, 12
 
 pop EDI
@@ -106,7 +106,7 @@ push EDI
 	ra_ptl1_start:
 		push EDI ; Element number (segment for level = 0)
 		push ESI ; Tree level
-		call kinternal_gettreeelement
+		call gettreeelement
 		add ESP, 8
 
 	; Restart loop if element is empty (all bits equal to 0)
@@ -169,7 +169,7 @@ push EDI
 	
 	push EAX
 	push EBX
-	call kinternal_gettreeelement
+	call gettreeelement
 	add ESP, 8
 
 	test EAX, EAX
@@ -183,7 +183,7 @@ push EDI
 	push DWORD 0xFFFFFFFF
 	push EAX
 	push EBX
-	call kinternal_settreeelement
+	call settreeelement
 	add ESP, 12
 	
 	pop EAX
@@ -191,7 +191,7 @@ push EDI
 
 	push EAX
 	push EBX
-	call kinternal_full_buddify
+	call full_buddify
 	add ESP, 8
 
 	pop EAX
@@ -299,7 +299,7 @@ push EDI
 	push DWORD 0
 	push EAX
 	push DWORD 0
-	call kinternal_settreeelement
+	call settreeelement
 	add ESP, 12
 
 	pop EAX
@@ -307,7 +307,7 @@ push EDI
 
 	push EAX
 	push DWORD 0
-	call kinternal_full_buddify
+	call full_buddify
 	add ESP, 8
 
 
@@ -363,7 +363,7 @@ push EDI
 
 	push DWORD 0
 	push ESI
-	call kinternal_gettreeelement ;Reading the top tree node to check whether allocation is possible
+	call gettreeelement ;Reading the top tree node to check whether allocation is possible
 	add ESP, 8
 
 	pop ECX
@@ -383,7 +383,7 @@ push EDI
 	push EBX
 	push DWORD 0
 	push ESI
-	call kinternal_allocate	;Searching for a free tree node on tree level ECX
+	call allocate	;Searching for a free tree node on tree level ECX
 	add ESP, 16
 
 	pop EDX
@@ -399,7 +399,7 @@ push EDI
 	push DWORD 0xFFFFFFFF
 	push EAX
 	push ECX
-	call kinternal_settreeelement
+	call settreeelement
 	add ESP, 12
 
 	pop EAX
@@ -413,7 +413,7 @@ push EDI
 
 	push EAX
 	push ECX
-	call kinternal_full_buddify
+	call full_buddify
 	add ESP, 8
 
 	pop EDX
@@ -443,7 +443,7 @@ ret
 
 ;This fuction finds an empty spot in the control structure, starting from the given node and returns its segment number. It assumes that the area can be allocated in that node (you need to check for that before calling this fuction)
 ;Takes 4 arguments: (uint32_t tree_level, uint32_t node_number, uint32_t segment_number_bitmask, uint32_t which_power_of_two)
-kinternal_allocate:
+allocate:
 mov EDX, ESP
 push EBP
 push EBX
@@ -468,7 +468,7 @@ push EDI
 
 	push EBX
 	push ECX
-	call kinternal_gettreeelement
+	call gettreeelement
 	add ESP, 8
 
 	pop EDX
@@ -498,7 +498,7 @@ push EDI
 	push ESI
 	push EBX
 	push ECX
-	call kinternal_allocate
+	call allocate
 	add ESP, 16
 
 	pop EDX
@@ -517,7 +517,7 @@ ret
 
 ;This function executes ,,buddify" on the given node and all its ancestors (parents, grandparents etc)
 ;Takes 2 arguments: (uint32_t tree_level, uint32_t node_number), returns nothing
-kinternal_full_buddify:
+full_buddify:
 mov EDX, ESP
 push EBP
 push EBX
@@ -540,7 +540,7 @@ fb_ptl1:
 	;Arguments
 	push ECX	;Node number
 	push EBX	;Tree level
-	call kinternal_buddify
+	call buddify
 	add ESP, 8
 
 	pop ECX
@@ -564,7 +564,7 @@ ret
 
 ;This function updates the node, so that it contains accurate information about block availibility. It does so, based on it's immediate children, so this function needs to be called on the entire tree branch at once, bottom to the top.
 ;Takes 2 arguments: (uint32_t tree_level, uint32_t node_number), returns nothing
-kinternal_buddify:
+buddify:
 mov ECX, ESP
 push EBP
 push EBX
@@ -579,7 +579,7 @@ push EDI
 	push EDX
 	push EBX
 	push EBP
-	call kinternal_gettreeelement	;Moving value of the left child into EAX
+	call gettreeelement	;Moving value of the left child into EAX
 	add ESP, 8
 	pop EDX
 	pop ECX
@@ -592,7 +592,7 @@ push EDI
 	push EDX
 	push EBX
 	push EBP
-	call kinternal_gettreeelement	;Moving value of the right child into EAX
+	call gettreeelement	;Moving value of the right child into EAX
 	add ESP, 8
 	pop EDX
 	pop ECX
@@ -619,7 +619,7 @@ push EDI
 	push EBX
 	push EAX
 	push EBP
-	call kinternal_settreeelement	;So we are saving this value into the tree
+	call settreeelement	;So we are saving this value into the tree
 	add ESP, 12
 
 pop EDI
@@ -634,7 +634,7 @@ ret
 
 ;Function takes 2 arguments: (uint32_t tree level, uint32_t node number)
 ;Returns an uint32_t, with the contains bits of that node (N youngest bits, where N-1 == level)
-kinternal_gettreeelement:
+gettreeelement:
 push EBP
 mov EBP, ESP
 push EBX
@@ -687,7 +687,7 @@ ret
 
 ;Function applies buddify to multiple nodes on the same tree level
 ;Takes 3 arguments: (uint32_t tree_level, uint32_t start_node, uint32_t end_node) It will run buddify on every node from start_node to end_node (including those two)
-kinternal_levelbuddify:
+levelbuddify:
 mov EDX, ESP
 push EBP
 push EBX
@@ -701,7 +701,7 @@ push EDI
 	lb_ptl1:
 		push ESI
 		push EBP
-		call kinternal_buddify
+		call buddify
 		add ESP, 8	;We are not restoring EAX, EDX and ECX, because we do not need those registers
 		add ESI, 1	;Moving to the next node
 	cmp ESI, EDI
@@ -717,7 +717,7 @@ ret
 ;This function calls full_buddify on a number of nodes in a time-effective manner.
 ;Takes 3 arguments: (uint32_t tree_level, uint32_t start_node, uint32_t end_node) It will run full_buddify on every node from start_node to end_node (including those two)
 
-kinternal_areafull_buddify:
+areafull_buddify:
 mov EDX, ESP
 push EBP
 push EBX
@@ -738,7 +738,7 @@ push EDI
 		push EDI	;Starting node number of this level
 		push ESI	;Ending node number on this level
 		push EBP	;Current level number
-		call kinternal_levelbuddify
+		call levelbuddify
 		add ESP, 12
 
 	cmp EBP, EBX
@@ -752,7 +752,7 @@ ret
 
 ;This function sets multiple tree elements on a given level to the given value. 
 ;It takes 4 arguments: (uint32_t tree_level, uint32_t starting_node, uint32_t ending node, uint32_t value)
-kinternal_areasettreeelement:
+areasettreeelement:
 mov EDX, ESP
 push EBP
 push EBX
@@ -767,7 +767,7 @@ push EDI
 		push EBX
 		push ESI
 		push EBP
-		call kinternal_settreeelement
+		call settreeelement
 		add ESP, 12
 
 		add ESI, 1	;Moving to the next node 
@@ -785,7 +785,7 @@ ret
 
 ;Function takes 3 arguments: (uint32_t tree_level, uint32_t node_number, uint32_t new_value)
 ;Note: only tree_level+1 youngest bits from the new_value will be used
-kinternal_settreeelement:
+settreeelement:
 push EBP
 mov EAX, ESP
 push EBX
@@ -894,7 +894,7 @@ testtreepointer:
 
 
 
-kinternal_initializetree:
+initializetree:
 push EBP
 push EBX
 push ESI
@@ -992,7 +992,7 @@ push EDI
 	push ECX
 	push EAX
 	push DWORD 0
-	call kinternal_areasettreeelement
+	call areasettreeelement
 	add ESP, 16
 
 	pop EDX
@@ -1002,7 +1002,7 @@ push EDI
 	push DWORD ECX
 	push DWORD EAX
 	push DWORD 0
-	call kinternal_areafull_buddify
+	call areafull_buddify
 	add ESP, 12
 
 	it_skiponesetting:
@@ -1055,7 +1055,7 @@ push EBX
 	mov [end], EAX
 
 	;Initializing the tree (this function is taking parameters from this global variables)
-	call kinternal_initializetree
+	call initializetree
 pop EBX
 pop EBP
 ret
