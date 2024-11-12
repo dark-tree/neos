@@ -15,6 +15,7 @@ typedef unsigned int size_t;
 #define ABI_PACKED __attribute__((packed, aligned(1)))
 #define ABI_CDECL __attribute__((__cdecl__))
 
+
 // varargs
 #ifndef va_start
 typedef __builtin_va_list va_list;
@@ -24,3 +25,4 @@ typedef __builtin_va_list va_list;
 #	define va_copy __builtin_va_copy
 #	define va_arg __builtin_va_arg
 #endif
+
