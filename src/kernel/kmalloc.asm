@@ -8,24 +8,61 @@ section .text
 
 extern memmove
 
-
-
-global test
-global kset
 global kmalloc
-
-global testtreesize
-global testtreepointer
-global kinternal_gettreeelement
-global kinternal_settreeelement
-global kinternal_buddify
-global kinternal_allocate
+global kset
 global kfree
 global krealloc
+global kmres
+
+;This function reserves a designated memory area (takes it out of the allocation pool permamently)
+;Takes 2 arguments: (void* pointer, uint32_t size)
+kmres:
+push EBP
+mov EBP, ESP
+push EBX
+push ESI
+push EDI
+	mov EAX, [EBP+8]
+	add EAX, [EBP+12]
+	sub EAX, 1 ;Calculating where the last byte of the desired reservation is, by adding size to offset and subtracting 1
+
+	sub EAX, [offset]
+	mov EDX, 0
+	mov EBX, KMALLOC_BLOCK_SIZE
+	div EBX
+	mov EDI, EAX	;Calculating the last segment of the reserved area (result in EDI)
+
+	mov EAX, [EBP+8]
+	sub EAX, [offset]
+	mov EDX, 0
+	div EBX
+	mov ESI, EAX
+
+	;Now the first segment of the reserved area is in ESI and the last one in EDI
+	
+	push DWORD 1
+	push EDI
+	push ESI
+	push DWORD 0
+	call kinternal_areasettreeelement	;Marking segments as allocated
+	add ESP, 16
+
+	push EDI
+	push ESI
+	push DWORD 0
+	call kinternal_areafull_buddify	;Propagating the change up the tree using buddify
+	add ESP, 12
+
+pop EDI
+pop ESI
+pop EBX
+pop EBP
+ret
 
 
 
-;Thsi function takes an allocated memory area and makes it larger (Note: the area will be moved and the memory copied, if necesarry)
+
+;This function takes an allocated memory area and makes it larger (Note: the area will be moved and the memory copied, if necesarry)
 ;Takes 2 arguments (void* pointer, uint32_t new_size), returns a pointer to the new area.
 krealloc:
 
@@ -40,6 +77,9 @@ push EDI
 
 	; Load 'pointer'
 	mov EAX, [ECX+4]
+	sub EAX, [offset]
+	mov [ECX+4], EAX
+
 
 	; Convert pointer to segment number
 	mov EDX, 0
@@ -60,14 +100,14 @@ push EDI
 
 	; This loop determines how large is the allocated area currently (value will be stored in ESI as a power of 2 (2^ESI)
 	ra_ptl1:
-	inc ESI
-	shr EDI, 1
+		inc ESI
+		shr EDI, 1
 
 	ra_ptl1_start:
-	push EDI ; Element number (segment for level = 0)
-	push ESI ; Tree level
+		push EDI ; Element number (segment for level = 0)
+		push ESI ; Tree level
 		call kinternal_gettreeelement
-	add ESP, 8
+		add ESP, 8
 
 	; Restart loop if element is empty (all bits equal to 0)
 	test EAX, EAX
@@ -108,7 +148,7 @@ push EDI
 	mov EAX, [ECX+4]
 	jae ra_return
 
-	mov EAX, [ECX+4]
+	add EAX, [offset]	;Adding offset, because we subtracted it earlier and kfree would subtract it again .
 
 	push ECX
 
@@ -126,6 +166,7 @@ push EDI
 	shr EAX, CL
 
 	push EAX
+	
 	push EAX
 	push EBX
 	call kinternal_gettreeelement
@@ -177,12 +218,15 @@ push EDI
 
 	pop ECX
 
+	test EAX, EAX
+	jz ra_skip_adding	;Kmalloc returning 0 means, that allocation could not be completed, so we do not add offset to this value
 
+	sub EAX, [offset]	;We are subtractring offset, because both kmalloc and krealloc add it at the end, so we would be adding it twice
+	
 
 
 	ra_return:
-	test EAX, EAX
-	jz ra_skip_copying
+	
 
 	push EAX
 
@@ -202,8 +246,10 @@ push EDI
 	pop EAX
 	push EAX
 
+	add EAX, [offset]
 	push EBX
 	mov EBX, [ECX+4]
+	add EBX, [offset]
 	push EBX
 	push EAX
 	call memmove
@@ -211,6 +257,13 @@ push EDI
 
 	pop EAX
 	ra_skip_copying:
+
+	
+	
+
+	add EAX, [offset]
+
+	ra_skip_adding:
 pop EDI
 pop ESI
 pop EBX
@@ -236,6 +289,7 @@ push EBX
 push ESI
 push EDI
 	mov EAX, [EDX+4]
+	sub EAX, [offset]
 	mov EDX, 0
 	mov EBX, KMALLOC_BLOCK_SIZE
 	div EBX		;Determining which segment the pointer points to
@@ -320,7 +374,7 @@ push EDI
 	mov EDI, 0
 	cmp EDI, EAX
 	mov EAX, 0
-	jne m_return	;...if not, we're returning 0 (null)
+	jne m_skip_adding	;...if not, we're returning 0 (null)
 
 	push ECX
 	push EDX
@@ -373,7 +427,13 @@ push EDI
 	mul EBX
 
 
+
 	m_return:
+
+
+	add EAX, [offset]
+
+	m_skip_adding:
 pop EDI
 pop ESI
 pop EBX
