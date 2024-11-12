@@ -4,6 +4,7 @@
 #include "types.h"
 #include "memory.h"
 #include "print.h"
+#include "kmalloc.h"
 
 /* private */
 
@@ -28,7 +29,6 @@ void mem_loadmap(MemoryMap* map) {
 	map->bytes = map->length * sizeof(MemoryEntry) + 4;
 	map->array = region + 4;
 }
-
 
 /* public */
 
@@ -65,6 +65,7 @@ void mem_init(uint32_t offset) {
 	}
 
 	uint64_t size = high - low;
+	kset(size, low);
 	kprintf("Allocator arena set to %#0.8x:%#0.8x, excluding read-only blocks...\n", (int) low, (int) high);
 
 	// exclude reserved regions
@@ -75,6 +76,7 @@ void mem_init(uint32_t offset) {
 			size -= entry.length;
 
 			kprintf(" * Reserved at %#0.8x (%ud bytes)\n", (int) entry.base, (int) entry.length);
+			kmres(entry.base, entry.length);
 		}
 	}
 
