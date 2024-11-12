@@ -39,7 +39,17 @@ void* memset(void* dst, uint8_t value, long bytes) {
 int strlen(const char* cstr) {
 	int length = 0;
 
-	while(cstr[length] != '\0') {
+	while(cstr[length] != 0x00) {
+		length ++;
+	}
+
+	return length;
+}
+
+int wstrlen(const short* wstr) {
+	int length = 0;
+
+	while(wstr[length] != 0x0000) {
 		length ++;
 	}
 

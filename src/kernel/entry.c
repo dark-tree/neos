@@ -2,44 +2,43 @@
 #include "types.h"
 #include "console.h"
 #include "print.h"
+#include "interrupt.h"
+#include "util.h"
+#include "cursor.h"
+#include "mem.h"
 
-#include "kmalloc.h"
+extern char asm_test();
+extern void pic_disable();
+
+#define X "\xDB"
+#define S " "
 
 void start() {
-        con_init(80, 25);
-	kprintf("\e[2J");
+	con_init(80, 25);
+	cur_enable();
 
+	// Init memory system and make room for the kernel
+	mem_init(0xFFFFF);
 
-	kset(1024*16, 1024*1024);
+//	kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m%#0.8x\e[m again!\n", "sweet", 'r', -1920);
 
-	kmres(1024*1024+2048, 1027);
+//	kprintf("\e[4B");
+//	kprintf("\e[29C" X S S S X S X X X X S S X X X S S X X X X"\n");
+//	kprintf("\e[29C" X X S S X S S S S S S X S S S X S S S S S"\n");
+//	kprintf("\e[29C" X S X S X S X X S S S X S X S X S X X X X"\n");
+//	kprintf("\e[29C" X S S X X S S S S S S X S S S X S S S S X"\n");
+//	kprintf("\e[29C" X S S S X S X X X X S S X X X S S X X X X"\n");
+//	kprintf("\e[29C" " Linux Compatible OS\n");
 
+	pic_disable();
+	int_init();
 
-	void * ptr5 = kmalloc(200);
-	kmalloc(100);
-	void * ptr6 = kmalloc(1599);
-	void * ptr7 = kmalloc(700);
+	kprintf("System ready!\n");
 
-	kprintf("%d\n", (int) ptr5);
-	kprintf("%d\n", (int) ptr6);
-	kprintf("%d\n", (int) ptr7);
+	//asm_test();
 
-
-	kfree(ptr6);
-
-	ptr6 = kmalloc(500);
-	void * ptr8 = kmalloc(700);
-	kprintf("%d\n", (int) ptr6);
-	kprintf("%d\n", (int) ptr8);
-
-	ptr8 = krealloc(ptr8, 3000);
-	kprintf("%d\n", (int) ptr8);
-	
-
-	while (true) {
-		__asm("hlt");
-
-	}
+	// never return to the bootloader
+	halt();
 }
 
 

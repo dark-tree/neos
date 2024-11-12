@@ -4,10 +4,16 @@ typedef unsigned char bool;
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
+typedef unsigned long long uint64_t;
 typedef unsigned int size_t;
 
 #define true 1
 #define false 0
+#define NULL 0
+
+// Helpers to control the binary interface
+#define ABI_PACKED __attribute__((packed, aligned(1)))
+#define ABI_CDECL __attribute__((__cdecl__))
 
 
 // varargs
