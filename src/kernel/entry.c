@@ -3,11 +3,7 @@
 #include "console.h"
 #include "print.h"
 
-extern void kset(uint32_t base, uint32_t offset);
-extern void* kmalloc(uint32_t size);
-extern void kfree(void* pointer);
-extern void kmres(void* pointer, uint32_t size);
-extern void* krealloc(void* pointer, uint32_t new_size);
+#include "kmalloc.h"
 
 void start() {
         con_init(80, 25);
