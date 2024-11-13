@@ -15,10 +15,12 @@ extern pic_accept
 
 ; See interrupt.c
 extern int_common_handle
+extern int_gone_bonkers
 
 global isr_name
 global isr_register
 global isr_init
+global int_go_bonkers
 
 %macro define_isr 3
 	push dword 1
@@ -77,9 +79,6 @@ isr_tail:
 	; Load CDECL handler pointer, we use a preserved register here
 	mov esi, [service_table + eax * 4]
 
-	; Used by int_common_handler
-	push eax
-
 	; Those will become the handler call arguments
 	push dword [ebp + 4 * 0] ; EDI
 	push dword [ebp + 4 * 1] ; ESI
@@ -92,6 +91,9 @@ isr_tail:
 	push dword ebp           ; EAX*
 
 	push edx
+	push eax
+
+	; Used by pic_irq and int_common_handler
 	push eax
 
 	; Convert interrupt number to IRQ bitmask (result in EAX)
@@ -135,6 +137,10 @@ isr_tail:
 
 	isr_tail_not_irq:
 
+	; Call this always, used by the "wait" subsystem
+	call int_common_handle
+	add esp, 4
+
 	; Call kernel handler procedure
 	test esi, esi
 	jz isr_tail_no_handle
@@ -146,10 +152,6 @@ isr_tail:
 
 	; Arguments were pushed before so we always pop them here
 	add esp, 4*8
-
-	; Call this always, used by the "wait" subsystem
-	call int_common_handle
-	add esp, 4
 
 	; This alignes with the saved segments from before
 	call gdtr_switch
@@ -166,6 +168,96 @@ isr_tail:
 	add esp, 8
 
 	iret
+
+
+int_go_bonkers:
+
+	push dword 1
+	push dword 2
+	push dword int_gone_bonkers
+	push dword service_table
+	call isr_stub_stack
+	add esp, 4*4
+
+	push eax
+	call isr_into_stack
+
+
+isr_into_stack:
+
+	; Ignore our own return address
+	add esp, 4
+
+	; Pop target stack
+	pop eax
+
+	; Pop caller's return address
+	pop edx
+
+	; Switch stacks
+	mov esp, eax
+
+	; Return to the caller's caller
+	jmp edx
+
+
+isr_stub_stack:
+	push ebp
+	mov ebp, esp
+
+	; Switch stack to the one given
+	mov ecx, [ebp+12] ; Load target instruction pointer
+	mov esp, [ebp+8]  ; Load target stack
+
+	clc
+	cld
+
+	; Interrupt parameters
+	pushf
+	or dword [esp], 0x0200  ; Enable interrupts when we iret
+
+	; Code segment to return to
+	mov ax, [ebp+20] ; Code Segment
+	shl ax, 3
+	push eax
+
+	; EIP will be restored from here after the interrupt
+	push ecx
+
+	; Head parameters
+	push dword 0x0000 ; Interrupt error code
+	push dword 0x00FF ; Interrupt number
+
+	; Mimic what pusha does
+	mov edx, esp
+
+	; First half of the 'pusha' block
+	push dword 'SOEN' ; EAX
+	push dword 0xECEC ; ECX
+	push dword 0xEDED ; EDX
+	push dword 0xEBEB ; EBX
+
+	; ESP will be "restored" from here after the interrupt
+	push edx
+
+	; The rest of the pusha block
+	push dword 0xB1B1 ; EBP
+	push dword 0x5151 ; ESI
+	push dword 0xD1D1 ; EDI
+
+	; Save segments
+	push dword [ebp+20]
+	push dword [ebp+16]
+
+	; Handler parameter block
+	sub esp, 4*8
+
+	; Return the adjusted stack pointer
+	mov eax, esp
+
+	mov esp, ebp
+	pop ebp
+	ret
 
 isr_name:
 	mov eax, [esp+4] ; Interrupt number
@@ -280,6 +372,9 @@ isr_init:
 
 
 section .data
+
+temp_stack:
+	times 4096 db 0
 
 service_table:
 	times 256 dd 0

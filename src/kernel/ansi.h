@@ -8,7 +8,7 @@
 #define ANSI_ESCAPE          0x1B /* Starts all the escape sequences (C1 codes) */
 #define ANSI_ESC_DCS         ((char) 0x90) /* Equivalent to ANSI_ESCAPE + ANSI_DCS */
 #define ANSI_ESC_CSI         ((char) 0x9B) /* Equivalent to ANSI_ESCAPE + ANSI_CSI */
-#define ANSI_ESC_OCS         ((char) 0x9D) /* Equivalent to ANSI_ESCAPE + ANSI_OSC */
+#define ANSI_ESC_OSC         ((char) 0x9D) /* Equivalent to ANSI_ESCAPE + ANSI_OSC */
 
 // Fe Escape Sequences
 #define ANSI_ST  '\\' /* String Terminator */
@@ -22,6 +22,8 @@
 // Fp Escape Sequences (Private Code)
 #define ANSI_DECSC '7' /* Save Current Cursor Position and Formatting Attributes */
 #define ANSI_DECRC '8' /* Restore Cursor Position and Formatting Attribute */
+#define ANSI_NEOEM '<' /* Enter Extended Mode, ignore the shortcut codes ANSI_ESC_DCS, ANSI_ESC_CSI, and ANSI_ESC_OSC */
+#define ANSI_NEOAM '>' /* Enter ASCII Mode, accept the the shortcut codes ANSI_ESC_DCS, ANSI_ESC_CSI, and ANSI_ESC_OSC */
 
 // Control Sequence Introducer
 #define ANSI_CSI_CUU 'A' /* Cursor Up */

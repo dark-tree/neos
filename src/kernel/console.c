@@ -31,10 +31,20 @@ static bool invert;
 static uint8_t attribute;
 static int width, height;
 static int x, y;
+static bool shortcuts;
 
 // saved state
 static uint8_t sa;
 static int sx, sy;
+
+static void con_cursor(int nx, int ny) {
+	if ((nx != x) || (ny != y)) {
+		x = nx;
+		y = ny;
+
+		cur_goto(nx + ny * width);
+	}
+}
 
 static int con_next_tab_stop() {
     return (x / CONSOLE_TAB_DISTANCE) * CONSOLE_TAB_DISTANCE + ((x % CONSOLE_TAB_DISTANCE) ? CONSOLE_TAB_DISTANCE : 0);
@@ -190,44 +200,42 @@ static void con_csi_execute(int* head, int last) {
 	// move cursor up
 	if (code == ANSI_CSI_CUU) {
 		int arg = con_next_int(head, last, 1);
-		y = max(y - arg, 0);
+		con_cursor(x, max(y - arg, 0));
 		return;
 	}
 
 	// move cursor down
 	if (code == ANSI_CSI_CUD) {
 		int arg = con_next_int(head, last, 1);
-		y = min(y + arg, height - 1);
+		con_cursor(x, min(y + arg, height - 1));
 		return;
 	}
 
 	// move cursor forward
 	if (code == ANSI_CSI_CUF) {
 		int arg = con_next_int(head, last, 1);
-		x = min(x + arg, width - 1);
+		con_cursor(min(x + arg, width - 1), y);
 		return;
 	}
 
 	// move cursor backward
 	if (code == ANSI_CSI_CUB) {
 		int arg = con_next_int(head, last, 1);
-		x = max(x - arg, 0);
+		con_cursor(max(x - arg, 0), y);
 		return;
 	}
 
 	// cursor next line
 	if (code == ANSI_CSI_CNL) {
 		int arg = con_next_int(head, last, 1);
-		x = 0;
-		y = min(y + arg, height - 1);
+		con_cursor(0, min(y + arg, height - 1));
 		return;
 	}
 
 	// cursor previous line
 	if (code == ANSI_CSI_CNL) {
 		int arg = con_next_int(head, last, 1);
-		x = 0;
-		y = min(y + arg, height - 1);
+		con_cursor(x, min(y + arg, height - 1));
 		return;
 	}
 
@@ -237,8 +245,7 @@ static void con_csi_execute(int* head, int last) {
 		con_next_char(head, last); // ';'
 		int m = con_next_int(head, last, 1) - 1;
 
-		x = clamp(n, 0, width - 1);
-		y = clamp(m, 0, height - 1);
+		con_cursor(clamp(n, 0, width - 1), clamp(m, 0, height - 1));
 		return;
 	}
 
@@ -319,8 +326,7 @@ static void con_csi_execute(int* head, int last) {
 
 	// restore cursor position
 	if (code == ANSI_CSI_RCP) {
-		x = sx;
-		y = sy;
+		con_cursor(sx, sy);
 		return;
 	}
 
@@ -352,18 +358,17 @@ static void con_lexer_until_st(char code);
 static void con_lexer_initial(char code) {
 
 	if (code == ANSI_BACKSPACE) {
-		if (x > 0) x --;
+		if (x > 0) con_cursor(x - 1, y);
 		return;
 	}
 
 	if (code == ANSI_CARRIAGE_RETURN) {
-		x = 0;
+		con_cursor(0, y);
 		return;
 	}
 
 	if (code == ANSI_LINE_FEED) {
-		y ++;
-		x = 0;
+		con_cursor(0, y + 1);
 
 		if (y >= height) {
 			con_scroll(+1);
@@ -376,7 +381,7 @@ static void con_lexer_initial(char code) {
 		return;
 	}
 
-	if (code == ANSI_ESC_CSI) {
+	if (shortcuts && (code == ANSI_ESC_CSI)) {
 		length = 0;
 		memset(sequence, 0, CONSOLE_MAX_ANSI_SEQUENCE);
 		sequence[length ++] = ANSI_CSI;
@@ -385,7 +390,7 @@ static void con_lexer_initial(char code) {
 		return;
 	}
 
-	if (code == ANSI_ESC_DCS || code == ANSI_ESC_OCS) {
+	if (shortcuts && (code == ANSI_ESC_DCS || code == ANSI_ESC_OSC)) {
 		length = 0;
 		memset(sequence, 0, CONSOLE_MAX_ANSI_SEQUENCE);
 		sequence[length ++] = ANSI_CSI;
@@ -395,7 +400,7 @@ static void con_lexer_initial(char code) {
 	}
 
 	if (code == ANSI_TAB) {
-		x = con_next_tab_stop();
+		con_cursor(con_next_tab_stop(), y);
 		goto adjust;
 	}
 
@@ -406,12 +411,15 @@ static void con_lexer_initial(char code) {
 
 adjust:
 
-	x ++;
+	int nx = x + 1;
+	int ny = y;
 
-	if (x >= width) {
-		x = 0;
-		y ++;
+	if (nx >= width) {
+		nx = 0;
+		ny ++;
 	}
+
+	con_cursor(nx, ny);
 
 	if (y >= height) {
 		con_scroll(+1);
@@ -435,6 +443,18 @@ static void con_lexer_escape(char code) {
 		return;
 	}
 
+	if (code == ANSI_NEOEM) {
+		shortcuts = false;
+		output_lexer = con_lexer_initial;
+		return;
+	}
+
+	if (code == ANSI_NEOAM) {
+		shortcuts = true;
+		output_lexer = con_lexer_initial;
+		return;
+	}
+
 	if (code == ANSI_DECSC) {
 		sx = x;
 		sy = y;
@@ -445,8 +465,7 @@ static void con_lexer_escape(char code) {
 
 	// restore cursor position
 	if (code == ANSI_DECRC) {
-		x = sx;
-		y = sy;
+		con_cursor(sx, sy);
 		attribute = sa;
 		output_lexer = con_lexer_initial;
 		return;
@@ -464,6 +483,7 @@ static void con_lexer_csi(char code) {
 	if (ANSI_CSI_FINAL(code)) {
 		con_execute();
 		output_lexer = con_lexer_initial;
+		return;
 	}
 
 	// error! we run out of space for ANSI control sequence
@@ -479,6 +499,7 @@ static void con_lexer_until_st(char code) {
 	if (code == ANSI_ST && length > 1 && sequence[length - 2] == ANSI_ESCAPE) {
 		con_execute();
 		output_lexer = con_lexer_initial;
+		return;
 	}
 
 	// error! we run out of space for ANSI control sequence
@@ -493,16 +514,22 @@ static void con_lexer_until_st(char code) {
 void con_init(int max_width, int max_height) {
 	width = max_width;
 	height = max_height;
-	x = 0;
-	y = 0;
+
 	attribute = CONSOLE_DEFAULT_ATTRIBUTE;
 	output_lexer = con_lexer_initial;
 	length = 0;
 	invert = false;
+	shortcuts = true;
+
+	// force con_cursor to actually send an update
+	x = 1;
+	con_cursor(0, 0);
 
 	sa = attribute;
 	sx = 0;
 	sy = 0;
+
+	con_erase(0, 0, width - 1, height - 1);
 }
 
 void con_scroll(int offset) {
@@ -516,30 +543,39 @@ void con_scroll(int offset) {
 
 	if (sign == -1) {
 		memmove(con_at(0, lines), con_at(0, 0), moves * row);
-		memset(con_at(0, 0), 0, clears * row);
+		con_erase(0, 0, 0, clears);
 
-		y += lines;
-		if (y > last) y = last;
+		// update cursor
+		int ny = y + lines;
+		if (ny > last) ny = last;
+		con_cursor(x, ny);
 
 		return;
 	}
 
 	if (sign == +1) {
 		memmove(con_at(0, 0), con_at(0, lines), moves * row);
-		memset(con_at(0, moves), 0, clears * row);
+		con_erase(0, moves, 0, moves + clears);
 
-		y -= lines;
-		if (y < 0) y = 0;
+		// update cursor
+		int ny = y - lines;
+		if (ny < 0) ny = 0;
+		con_cursor(x, ny);
 
 		return;
 	}
 }
 
 void con_erase(int x1, int y1, int x2, int y2) {
-	void* start = con_at(x1, y1);
-	void* end = con_at(x2, y2);
+	uint8_t* glyph = con_at(x1, y1);
+	uint8_t* end = con_at(x2, y2);
 
-	memset(start, 0, end - start);
+	while (glyph < end) {
+		glyph[0] = 0;
+		glyph[1] = CONSOLE_DEFAULT_ATTRIBUTE;
+
+		glyph += 2;
+	}
 }
 
 void con_write(char code) {

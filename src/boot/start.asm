@@ -13,6 +13,9 @@ section .text
 
 start:
 
+	; Download the memory map from the BIOS
+	call memmap
+
 	cli
 
 	; Load temporary global descriptor table
@@ -31,8 +34,56 @@ start:
 	mov fs, ax
 	mov gs, ax
 
+
+
 	; Set the code segment using a far-jump
 	jmp 0x08:0x8000
+
+memmap:
+
+	; Initial continuation value, BIOS defined query entry identifier
+	; All we know is that each time we run int 0x15, AX=0xE820 we should pass
+	; the continuation returned by the previous call unmodified, or pass 0 if this is the first call
+	xor ebx, ebx
+
+	; Reset segment to 0, as BIOS will write to ES:DI
+	mov es, bx
+
+	; The starting address of the memory map
+	mov di, 0x500
+
+	; first dword will be used to store length of the memory map
+	add di, 4
+
+	; Start length at 1, we incremnt after learning that there are more entries not before
+	mov dword es:[0x500], 0
+
+	memmap_load:
+
+		; Fill basic static function information
+		mov eax, 0xE820     ; BIOS "Query System Address Map" function identifier
+		mov ecx, 20         ; Maximum number of bytes to fill, 20 is the minimum
+		mov edx, 0x534D4150 ; Magic Value
+
+		; Make the call
+		int 0x15
+
+		; Bios signifies end of memory map by either setting carry
+		; or retruning 0 as the continuation value (EBX)
+		jc memmap_done
+
+		test ebx, ebx
+		jz memmap_done
+
+		; Move to the next entry
+		add di, 20
+
+		inc dword es:[0x500]
+
+	jmp memmap_load
+
+	memmap_done:
+	ret
 
 section .data
 
