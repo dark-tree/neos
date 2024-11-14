@@ -21,7 +21,8 @@ KERNEL_CC = \
 	build/kernel/math.o \
 	build/kernel/interrupt.o \
 	build/kernel/syscall.o \
-	build/kernel/mem.o
+	build/kernel/mem.o \
+	build/kernel/rivendell.o
 
 # Configuration
 CC_FLAGS = -nostdinc -fomit-frame-pointer -fno-builtin -nodefaultlibs -nostdlib -ffreestanding
