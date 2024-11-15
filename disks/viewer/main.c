@@ -1,11 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
-#define fat_DEBUG
 #include "fat.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
+
+void kprintf(const char* pattern, ...) {
+	va_list args;
+	va_start(args, pattern);
+	vprintf(pattern, args);
+	va_end(args);
+}
 
 void interactive_file_explorer(fat_DISK* disk) {
 	printf("---===### FAT Explorer 2000 ###===---\n");
@@ -16,6 +23,8 @@ void interactive_file_explorer(fat_DISK* disk) {
 	printf("  cat > <file>     write to file\n");
 	printf("  cat >> <file>    append to file\n");
 	printf("  rm <file>        remove file\n");
+	printf("  mkdir <dir>      create directory\n");
+	printf("  rmdir <dir>      remove directory\n");
 	printf("  save <file>      save file to disk\n");
 	printf("  exit             exit the program\n");
 
@@ -144,6 +153,26 @@ void interactive_file_explorer(fat_DISK* disk) {
 				}
 				continue;
 			}
+			else if (strncmp(command, "mkdir ", 6) == 0) {
+				char* path = command + 6;
+				if (fat_create_dir(&tmp_dir, &current_dir, path, 0)) {
+					printf("Directory created\n");
+				}
+				else {
+					printf("Error: Could not create directory\n");
+				}
+				continue;
+			}
+			else if (strncmp(command, "rmdir ", 6) == 0) {
+				char* path = command + 6;
+				if (fat_remove(&current_dir, path, 0)) {
+					printf("Directory removed\n");
+				}
+				else {
+					printf("Error: Could not remove directory\n");
+				}
+				continue;
+			}
 			else if (strncmp(command, "save ", 5) == 0) {
 				char* path = command + 5;
 				if (fat_fopen(&tmp_file, &current_dir, path, "r")) {
@@ -186,38 +215,6 @@ void interactive_file_explorer(fat_DISK* disk) {
 	}
 }
 
-void fs_test(fat_DISK* disk) {
-	for (int i = 0; i < 1; i++) {
-		fat_FILE file;
-		if (fat_fopen(&file, &disk->root_directory, "files/readme.txt", "r")) {
-			fat_fseek(&file, 0xff, fat_SEEK_END);
-
-			unsigned char data[512];
-			for (int i = 0; i < 512; i++) {
-				data[i] = 'A' + (i % 26);
-			}
-			fat_fwrite(data, 1, 512, &file);
-			fat_fwrite("\n", 1, 1, &file);
-			
-
-			fat_fseek(&file, 0, fat_SEEK_END);
-			unsigned int size_read = fat_ftell(&file);
-			fat_fseek(&file, 0, fat_SEEK_SET);
-
-			char* buffer = (char*)malloc(size_read + 1);
-			fat_fread(buffer, 1, size_read, &file);
-			buffer[size_read] = '\0';
-
-			printf("Result\n");
-			fat_print_buffer((unsigned char*)buffer, size_read);
-			free(buffer);
-		}
-		else {
-			printf("Error: Could not open file\n");
-		}
-	}
-}
-
 void disk_read_func(unsigned char* data_out, unsigned int offset_in, unsigned int size_in, void* user_args) {
 	FILE* file = (FILE*)user_args;
 	fseek(file, offset_in, SEEK_SET);
@@ -246,7 +243,6 @@ int main() {
 		return 1;
 	}
 
-	//fs_test(&disk);
 	interactive_file_explorer(&disk);
 
 	fclose(file);

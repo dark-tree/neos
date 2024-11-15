@@ -468,7 +468,7 @@ static int fat_find_full(fat_DIR* subdir_out, fat_FILE* file_out, fat_DIR* root_
 
 	// The directory is a file that contains the directory entries
 	fat_FILE directory_file = {
-		.disk = subdir_out->dir_file.disk,
+		.disk = root_dir->dir_file.disk,
 		.fat_dir = root_dir->dir_file.fat_dir,
 		.cursor = 0
 	};
@@ -550,11 +550,16 @@ static int fat_find_full(fat_DIR* subdir_out, fat_FILE* file_out, fat_DIR* root_
 
 		if (read_at_cursor){
 			if (entries == root_dir->dir_file.cursor) {
-				found = (subdir_out->dir_file.fat_dir.DIR_Attr & 0x10) ? fat_FOUND_DIR : fat_FOUND_FILE;
+				found = (subdir_out->dir_file.fat_dir.DIR_Attr & fat_ATTR_DIRECTORY) ? fat_FOUND_DIR : fat_FOUND_FILE;
 				if (file_out != NULL && found == fat_FOUND_FILE) {
 					file_out->fat_dir = subdir_out->dir_file.fat_dir;
 					memory_copy(file_out->long_filename, subdir_out->dir_file.long_filename, sizeof(subdir_out->dir_file.long_filename));
 				}
+				fat_FILE* file_out_ptr = (found == fat_FOUND_FILE) ? file_out : &subdir_out->dir_file;
+				file_out_ptr->entry_position = dir_offset - sizeof(fat_dir_entry);
+				file_out_ptr->first_parent_cluster = directory_file.fat_dir.DIR_FstClusLO;
+				file_out_ptr->lfn_present = lfn_present;
+
 				root_dir->dir_file.cursor++;
 				break;
 			}
@@ -572,6 +577,11 @@ static int fat_find_full(fat_DIR* subdir_out, fat_FILE* file_out, fat_DIR* root_
 						if (!is_file) {
 							// Found the directory, end the search
 							found = fat_FOUND_DIR;
+
+							subdir_out->dir_file.entry_position = dir_offset - sizeof(fat_dir_entry);
+							subdir_out->dir_file.first_parent_cluster = directory_file.fat_dir.DIR_FstClusLO;
+							subdir_out->dir_file.lfn_present = lfn_present;
+
 							break;
 						}
 					}
@@ -771,18 +781,51 @@ void fat_update_lfn(fat_FILE* file, unsigned char remove) {
 }
 
 unsigned char fat_remove(fat_DIR* root_dir, const char* path, unsigned char is_file) {
-	fat_DIR helper_dir;
-	fat_FILE helper_file;
-	int find_success = fat_find(&helper_dir, &helper_file, root_dir, path, is_file, 0);
+	fat_DIR found_dir;
+	fat_FILE found_file;
+	int find_success = fat_find(&found_dir, &found_file, root_dir, path, is_file, 0);
 
 	if (find_success == fat_FOUND_FILE) {
-		fat_update_lfn(&helper_file, 1);
+		fat_update_lfn(&found_file, 1);
 
 		// Set the entry in the directory as free
-		helper_file.fat_dir.DIR_Name[0] = 0xE5;
-		fat_update_entry(&helper_file);
+		found_file.fat_dir.DIR_Name[0] = 0xE5;
+		fat_update_entry(&found_file);
 
-		fat_remove_fat_chain(&helper_file);
+		fat_remove_fat_chain(&found_file);
+
+		return 1;
+	}
+
+	if (find_success == fat_FOUND_DIR) {
+		fat_DIR helper_dir;
+		fat_FILE helper_file;
+		
+		fat_rewinddir(&found_dir);
+
+		while (1) {
+			int dir_entry = fat_readdir(&helper_dir, &helper_file, &found_dir);
+
+			if (dir_entry == fat_NOT_FOUND) {
+				break;
+			}
+
+			fat_FILE* file_ptr = dir_entry == fat_FOUND_FILE ? &helper_file : &helper_dir.dir_file;
+
+			if (file_ptr->fat_dir.DIR_Name[0] == '.' || (file_ptr->fat_dir.DIR_Name[0] == '.' && file_ptr->fat_dir.DIR_Name[1] == '.')) {
+				continue;
+			}
+
+			char new_path[sizeof(file_ptr->long_filename) / 2];
+			fat_longname_to_string(file_ptr->long_filename, new_path);
+			fat_remove(&found_dir, new_path, (file_ptr->fat_dir.DIR_Attr & fat_ATTR_DIRECTORY) == 0);
+		}
+
+		// Set the entry in the directory as free
+		found_dir.dir_file.fat_dir.DIR_Name[0] = 0xE5;
+		fat_update_entry(&found_dir.dir_file);
+
+		fat_remove_fat_chain(&found_dir.dir_file);
 
 		return 1;
 	}

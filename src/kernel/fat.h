@@ -12,9 +12,6 @@
 */
 typedef void(*fat_disk_access_func_t)(unsigned char* data, unsigned int offset_in, unsigned int size_in, void* user_args);
 
-// for compiling outside of the kernel
-// #define kprintf printf
-
 #define fat_NOT_FOUND 0
 #define fat_FOUND_DIR 1
 #define fat_FOUND_FILE 2
