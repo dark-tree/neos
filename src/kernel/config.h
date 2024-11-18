@@ -34,3 +34,6 @@
  *        bootloader. Refere to the BIOS Function INT 0x15, EAX = 0xE820
  */
 #define MEMORY_MAP_RAM 0x500
+
+
+#define INITIAL_PROCESS_TABLE_SIZE 2
