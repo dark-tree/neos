@@ -6,9 +6,13 @@
 #include "util.h"
 #include "cursor.h"
 #include "mem.h"
+#include "scheduler.h"
 
 extern char asm_test();
 extern void pic_disable();
+
+extern void* getprocess1();
+extern void* getprocess2();
 
 #define X "\xDB"
 #define S " "
@@ -20,21 +24,15 @@ void start() {
 
 	// Init memory system and make room for the kernel
 	mem_init(0xFFFFF);
+    pic_disable();
+    int_init();
 
     scheduler_init();
 
-    scheduler_new_entry(14, 0, 0);
-    scheduler_new_entry(12, 0, 0);
-    scheduler_new_entry(10, 0, 0);
-    scheduler_new_entry(8, 0, 0);
-    scheduler_new_entry(6, 0, 0);
+    scheduler_create_process(-1, getprocess1());
+    scheduler_create_process(-1, getprocess2());
 
-    kprintf("\n%d", get_index(0));
-    kprintf("\n%d", get_index(1));
-    kprintf("\n%d", get_index(2));
-    kprintf("\n%d", get_index(3));
-    kprintf("\n%d", get_index(4));
-    halt();
+    __asm("int $0x01");
 
 //	kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m%#0.8x\e[m again!\n", "sweet", 'r', -1920);
 
@@ -46,12 +44,11 @@ void start() {
 //	kprintf("\e[29C" X S S S X S X X X X S S X X X S S X X X X"\n");
 //	kprintf("\e[29C" " Linux Compatible OS\n");
 
-	pic_disable();
-	int_init();
+
 
 	kprintf("System ready!\n");
 
-	//asm_test();
+    //asm_test();
 
 	// never return to the bootloader
 	halt();

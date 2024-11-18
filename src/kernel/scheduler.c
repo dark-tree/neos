@@ -1,6 +1,9 @@
 #include "types.h"
 #include "config.h"
 #include "kmalloc.h"
+#include "routine.h"
+#include "print.h"
+
 
 //Only for testing. Will be replace with an actual fire descriptor.
 typedef struct
@@ -25,13 +28,21 @@ typedef struct {
     FileDescriptor* files;
 } ProcessDescriptor;
 
-
+void testint()
+{
+    kprintf("INterrprut!\n");
+}
 
 ProcessDescriptor* general_process_table;
 int process_count;
 int process_table_size = INITIAL_PROCESS_TABLE_SIZE;
 
 int process_running;
+
+int scheduler_get_current_pid()
+{
+    return process_running;
+}
 
 //For testing only
 int get_index(int i)
@@ -43,6 +54,7 @@ void scheduler_init()
 {
     process_running = (-1);
     general_process_table = (ProcessDescriptor*)kmalloc(sizeof(ProcessDescriptor)*process_table_size);
+
 }
 
 
@@ -67,16 +79,18 @@ void scheduler_create_process(int parent_index, void* process_memory)
 {
     int process_size = 2000; //For testing only - will be replaced with an allocator call, to check size. Followed by a krealloc call to create space for heap and stack.
     void* stack = process_memory+process_size;
+    stack = isr_stub_stack(stack, process_memory, 2, 1);
     scheduler_new_entry(parent_index, stack, process_memory);
 
 }
 
-int scheduler_context_switch()
+int scheduler_context_switch(void* old_stack)
 {
     if(process_count==0)
     {
         return 0;
     }
+    general_process_table[process_running].stack = old_stack;
     process_running++;
     while(general_process_table[process_running].exists==false)
     {

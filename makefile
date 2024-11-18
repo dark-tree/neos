@@ -11,6 +11,7 @@ KERNEL_AS = \
 	build/kernel/pic.o \
 	build/kernel/util.o \
 	build/kernel/cursor.o \
+	build/kernel/context_switch.o \
 	build/kernel/forschedulertesting.o
 
 # Kernel C object files

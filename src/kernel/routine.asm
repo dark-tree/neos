@@ -21,6 +21,8 @@ global isr_name
 global isr_register
 global isr_init
 global int_go_bonkers
+global isr_stub_stack
+global isr_into_stack
 
 %macro define_isr 3
 	push dword 1
