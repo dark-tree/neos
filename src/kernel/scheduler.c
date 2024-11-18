@@ -100,7 +100,7 @@ int scheduler_context_switch(void* old_stack)
     {
         process_running=0;
     }
-    return general_process_table[process_running].stack;
+    return (int)general_process_table[process_running].stack;
 }
 
 

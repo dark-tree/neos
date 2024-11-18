@@ -59,7 +59,7 @@ void int_wait() {
 	}
 }
 
-extern int_go_bonkers();
+extern int int_go_bonkers();
 
 void int_gone_bonkers() {
 	panic("Just a test, panic() called from int_gone_bonkers()");
