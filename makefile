@@ -10,7 +10,8 @@ KERNEL_AS = \
 	build/kernel/routine.o \
 	build/kernel/pic.o \
 	build/kernel/util.o \
-	build/kernel/cursor.o
+	build/kernel/cursor.o \
+	build/kernel/forschedulertesting.o
 
 # Kernel C object files
 KERNEL_CC = \
