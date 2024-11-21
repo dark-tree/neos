@@ -32,7 +32,7 @@ void start() {
     scheduler_create_process(-1, getprocess1());
     scheduler_create_process(-1, getprocess2());
 
-    __asm("int $0x01");
+    //__asm("int $0x01");
 
 //	kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m%#0.8x\e[m again!\n", "sweet", 'r', -1920);
 

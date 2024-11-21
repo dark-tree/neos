@@ -80,10 +80,10 @@ void int_init() {
 		isr_register(i, int_debug_handle);
 	}
 
-	isr_register(0x20, NULL);             // stop the timer spam
+    //isr_register(0x20, NULL);             // stop the timer spam
     //isr_register(0x01, int_go_bonkers);   // the forbidden interrupt:tm:
 	isr_register(0x80, int_linux_handle); // forward syscalls to the syscall system
-    isr_register(0x01, context_switch);
+    isr_register(0x20, context_switch);
 
 	// Point the processor at the IDT and enable interrupts
 	idtr_store(MEMORY_MAP_IDT, 0x81);

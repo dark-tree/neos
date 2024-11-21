@@ -26,8 +26,8 @@ process1:
 	mov EAX, process1text
 	push EAX
 	call kprintf
-	add EAX, 4
-	int 01h
+	add ESP, 8
+
 jmp process1
 
 
@@ -45,8 +45,8 @@ process2:
 	mov EAX, process2text
 	push EAX
 	call kprintf
-	add EAX, 8
-	int 01h
+	add ESP, 8
+
 jmp process2
 
 
