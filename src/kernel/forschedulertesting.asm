@@ -19,16 +19,17 @@ global getprocess2
 
 
 process1:
-	mov EAX, [p1i]
+	mov EAX, 0
+proc1ptl:
 	add EAX, 1
-	mov [p1i], EAX
 	push EAX
-	mov EAX, process1text
-	push EAX
+	mov ECX, process1text
+	push ECX
 	call kprintf
-	add ESP, 8
+	add ESP, 4
+	pop EAX
 
-jmp process1
+jmp proc1ptl
 
 
 
@@ -38,23 +39,21 @@ times 2000 db 0
 
 
 process2:
-	mov EAX, [p2i]
+	mov EAX, 0
+proc2ptl:
 	add EAX, 1
-	mov [p2i], EAX
 	push EAX
-	mov EAX, process2text
-	push EAX
+	mov ECX, process2text
+	push ECX
 	call kprintf
-	add ESP, 8
+	add ESP, 4
+	pop EAX
 
-jmp process2
+jmp proc2ptl
 
 
 
 times 2000 db 0
-
-p1i: dd 0
-p2i: dd 0
 
 process1text: db `Im process 1! Hello! Iteration: %d! `, 0
 process2text: db 'Im process 2! Hello! Iteration: %d!', 0
