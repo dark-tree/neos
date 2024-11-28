@@ -62,3 +62,16 @@ extern void kmres(void* pointer, uint32_t size);
  * @return Pointer to the enlarged memory area. 0 if enlargment was not possible.
  */
 extern void* krealloc(void* pointer, uint32_t new_size);
+
+
+
+/**
+ * @brief Measures the size of an allocated area. If used on an unallocated memory space - the behaviour is undefined.
+ *
+ * @note Allocator allocates memory based on the buddy system, using blocks. Therefore actual size of an allocated area (which this function will return) will be larger than the size given in malloc. It is NOT a bug, it's a feature.
+ *
+ * @param[in] pointer Pointer to any byte in the allocated area.
+ *
+ * @return Actual size of the allocated memory area.
+ */
+extern uint32_t kmsz(void* pointer);

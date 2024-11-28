@@ -6,6 +6,7 @@
 #include "util.h"
 #include "cursor.h"
 #include "mem.h"
+#include "kmalloc.h"
 
 extern char asm_test();
 extern void pic_disable();
@@ -20,8 +21,13 @@ void start() {
 	// Init memory system and make room for the kernel
 	mem_init(0xFFFFF);
 
-//	kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m%#0.8x\e[m again!\n", "sweet", 'r', -1920);
-
+    kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m%#0.8x\e[m again!\n", "sweet", 'r', -1920);
+    void* ptr = kmalloc(50000000);
+    kprintf("\n%d", ptr);
+    void* ptr2 = kmalloc(1000);
+    kprintf("\n%d", ptr2);
+    kprintf("\n%d", kmsz(ptr));
+    halt();
 //	kprintf("\e[4B");
 //	kprintf("\e[29C" X S S S X S X X X X S S X X X S S X X X X"\n");
 //	kprintf("\e[29C" X X S S X S S S S S S X S S S X S S S S S"\n");
