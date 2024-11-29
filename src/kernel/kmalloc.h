@@ -68,7 +68,7 @@ extern void* krealloc(void* pointer, uint32_t new_size);
 /**
  * @brief Measures the size of an allocated area. If used on an unallocated memory space - the behaviour is undefined.
  *
- * @note Allocator allocates memory based on the buddy system, using blocks. Therefore actual size of an allocated area (which this function will return) will be larger than the size given in malloc. It is NOT a bug, it's a feature.
+ * @note Allocator allocates memory based on the buddy system, using blocks. Therefore actual size of an allocated area (which this function will return) could be larger than the size given in malloc. It is NOT a bug, it's a feature.
  *
  * @param[in] pointer Pointer to any byte in the allocated area.
  *
