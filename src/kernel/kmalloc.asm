@@ -7,6 +7,7 @@ bits 32
 section .text
 
 extern memmove
+extern clamp
 
 global kmalloc
 global kset
@@ -86,6 +87,29 @@ push EDI
 	mov EAX, [EBP+8]
 	add EAX, [EBP+12]
 	sub EAX, 1 ;Calculating where the last byte of the desired reservation is, by adding size to offset and subtracting 1
+
+	mov EBX, [offset]
+	add EBX, [size]
+	sub EBX, 1
+	
+	push EBX
+	mov ECX, [offset]
+	push ECX
+	push EAX
+	call clamp
+	add ESP, 12
+
+	push EAX
+
+	push EBX
+	mov ECX, [offset]
+	push ECX
+	push DWORD [EBP+8]
+	call clamp
+	add ESP, 12
+	mov [EBP+8], EAX
+
+	pop EAX
 
 	sub EAX, [offset]
 	mov EDX, 0
