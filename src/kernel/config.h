@@ -34,3 +34,13 @@
  *        bootloader. Refere to the BIOS Function INT 0x15, EAX = 0xE820
  */
 #define MEMORY_MAP_RAM 0x500
+
+/**
+ *
+ */
+#define FILE_MAX_NAME 256
+
+/**
+ *
+ */
+#define PATH_MAX_RESOLVES 64

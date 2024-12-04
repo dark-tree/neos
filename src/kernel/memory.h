@@ -59,3 +59,8 @@ int strlen(const char* cstr);
  * @return Returns The length of the null-terminated wide string.
  */
 int wstrlen(const short* wstr);
+
+/**
+ *
+ */
+int streq(const char* lcstr, const char* rcstr);

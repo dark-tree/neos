@@ -21,12 +21,14 @@ KERNEL_CC = \
 	build/kernel/math.o \
 	build/kernel/interrupt.o \
 	build/kernel/syscall.o \
-	build/kernel/mem.o
+	build/kernel/mem.o \
+	build/kernel/vfs.o \
+	build/kernel/procfs.o
 
 # Configuration
-CC_FLAGS = -nostdinc -fomit-frame-pointer -fno-builtin -nodefaultlibs -nostdlib -ffreestanding
-LD = ld -melf_i386 -nostdlib
-CC = gcc -m32 -fno-pie -std=gnu99 -Wall -Wextra $(CC_FLAGS) -O2 -c
+CC_FLAGS = -nostdinc -fomit-frame-pointer -fno-builtin -nodefaultlibs -nostdlib -ffreestanding -g
+LD = ld -melf_i386 -nostdlib -g
+CC = gcc -m32 -fno-pie -std=gnu99 -Wall -Wextra $(CC_FLAGS) -O0 -c
 AS = nasm -f elf32
 OC = objcopy -O binary
 
@@ -57,6 +59,10 @@ $(KERNEL_CC): build/kernel/%.o: src/kernel/%.c build
 # Describes the recipes for all kernel .asm files
 $(KERNEL_AS): build/kernel/%.o: src/kernel/%.asm build
 	$(AS) $< -o $@
+
+# Construct the symbol file
+build/kernel.dwarf:
+	$(LD) -T src/link/debug.ld -o build/kernel.dwarf $(KERNEL_CC) $(KERNEL_AS)
 
 # Compile the kernel to a flat binary
 build/kernel/kernel.bin: build src/link/kernel.ld $(KERNEL_AS) $(KERNEL_CC)
@@ -90,9 +96,9 @@ run: build/final.iso
 	qemu-system-i386 -monitor stdio -cdrom ./build/final.iso -boot a -d cpu_reset -D ./output
 
 # Invoke QEMU and wait for GDB
-debug: build/final.iso
+debug: build/final.iso build/kernel.dwarf
 	qemu-system-i386 -singlestep -cdrom ./build/final.iso -boot a -s -S &
-	gdb -ex 'target remote localhost:1234' -ex 'break *0x8000' -ex 'c'
+	gdb -ex 'target remote localhost:1234' -ex 'symbol-file build/kernel.dwarf' -ex 'break *0x8000' -ex 'c'
 
 disasm: build/bootloader.bin
 	ndisasm -b 16 -o 7c00h ./build/bootloader.bin

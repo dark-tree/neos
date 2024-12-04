@@ -122,6 +122,11 @@ static char u16_to_cp437(short chr) {
 }
 
 static void kprint_wstring(PrintState* state, const uint16_t* string) {
+
+	if (string == NULL) {
+		string = "(\0n\0u\0l\0l\0)\0\0";
+	}
+
 	int length = wstrlen(string);
 	int padding = 0;
 
@@ -145,6 +150,11 @@ static void kprint_wstring(PrintState* state, const uint16_t* string) {
 }
 
 static void kprint_string(PrintState* state, const char* string) {
+
+	if (string == NULL) {
+		string = "(null)";
+	}
+
 	int length = strlen(string);
 	int padding = 0;
 

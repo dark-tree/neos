@@ -6,6 +6,8 @@
 #include "util.h"
 #include "cursor.h"
 #include "mem.h"
+#include "vfs.h"
+#include "memory.h"
 
 extern char asm_test();
 extern void pic_disable();
@@ -18,7 +20,7 @@ void start() {
 	cur_enable();
 
 	// Init memory system and make room for the kernel
-	mem_init(0xFFFFF);
+	mem_init(0xFFFFF + 1);
 
 //	kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m%#0.8x\e[m again!\n", "sweet", 'r', -1920);
 
@@ -33,12 +35,30 @@ void start() {
 	pic_disable();
 	int_init();
 
+	vfs_init();
+
+	// for now mount /proc at /
+	FilesystemDriver procfs;
+	procfs_load(&procfs);
+	vfs_mount("/", &procfs);
+
+	vRef root = vfs_root();
+	vfs_print(root.node, 0);
+
 	kprintf("System ready!\n");
+
+//	vRef root;
+//	root.offset = 0;
+//	root.node = &vfs_root;
+//	root.driver = NULL;
+//	root.state = NULL;
+
+
+	//vfs_open(root, "/testing/omg/tmp/test.txt");
+	vfs_open(&root, "./abcd/../tmp/haha.txt");
 
 	//asm_test();
 
 	// never return to the bootloader
 	halt();
 }
-
-
