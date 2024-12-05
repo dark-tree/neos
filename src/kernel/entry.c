@@ -55,7 +55,7 @@ void start() {
 
 	vRef root = vfs_root();
 	//vfs_open(root, "/testing/omg/tmp/test.txt");
-	vfs_open(&root, "./abcd/../tmp/haha.txt");
+	vfs_open(&root, "./abcd/../tmp/haha.txt", 0);
 
 	//asm_test();
 

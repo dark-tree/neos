@@ -123,6 +123,7 @@ static void vfs_enter(vRef* vref, const char* part) {
 		if (vref->offset > 0) {
 			vref->offset --;
 			vfs_update(vref);
+			//vref->driver->open(vref, );
 			kprintf(" * driver %s: open %s\n", vref->driver->identifier, part);
 			return;
 		}
@@ -162,7 +163,7 @@ bool vfs_isreadable(int open_flags) {
 	return (open_flags & OPEN_RDWR) || !(open_flags & OPEN_WRONLY);
 }
 
-vRef vfs_open(vRef* relation, const char* path) {
+vRef vfs_open(vRef* relation, const char* path, uint32_t flags) {
 
 	kprintf("open '%s'\n", path);
 

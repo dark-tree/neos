@@ -121,8 +121,8 @@ typedef int (*driver_clone) (vRef* dst, vRef* src);
  * @param[in] vref  The directory to open the file/directory from
  * @param[in] part  The name of the file/directory to open
  * @param[in] flags combination of the following flags:
- *                  OPEN_WRONLY    Open in write-only mode
- *                  OPEN_RDWR      Open in read-only mode
+ *                  OPEN_WRONLY    Open in write-only mode (See vfs_iswriteable())
+ *                  OPEN_RDWR      Open in read-only mode (See vfs_isreadable())
  *                  OPEN_APPEND    Set the file cursor initially at the end of the file
  *                  OPEN_CREAT     Create if file is missing
  *                  OPEN_EXCL      Require creation, fail if present
@@ -184,7 +184,7 @@ typedef int (*driver_write) (vRef* vref, void* buffer, uint32_t count);
  *
  * @note whence is alredy verified to be a valid value by the VFS subsystem
  *
- * Returns number of bytes from file start on success and a negated ERRNO code on error
+ * @return Returns number of bytes from file start on success and a negated ERRNO code on error
  *         LINUX_EIO     - Internal IO error occured in the filesystem itself
  *         LINUX_EINVAL  - Offset falls outside seekable range
  */
@@ -197,7 +197,7 @@ typedef int (*driver_seek) (vRef* vref, int offset, int whence);
  * @param[out] entries the buffer to write to
  * @param[in] max buffer size (in vEntry multiples)
  *
- * Returns number of entries written on success and a negated ERRNO code on error
+ * @return Returns number of entries written on success and a negated ERRNO code on error
  *         LINUX_EIO     - Internal IO error occured in the filesystem itself
  *         LINUX_ENOTDIR - Vref isn't a directory
  */
@@ -241,20 +241,39 @@ typedef int (*driver_remove) (vRef* vref, bool rmdir);
  */
 typedef int (*driver_stat) (vRef* vref, vStat* stat);
 
+/**
+ * @brief Read link path into the given buffer
+ *
+ * @param[in] vref    The vRef of the node that is to be queried
+ * @param[in] name    Name of the link to read
+ * @param[out] buffer The buffer into which the link will be written
+ * @param[in] size    The length (in bytes) of the given buffer.
+ *
+ * @note If size is smaller than the number of bytes to be written the excess data should
+ *       be truncated.
+ *
+ * @return Returns number of bytes from file start on success and a negated ERRNO code on error
+ *         LINUX_EIO     - Internal IO error occured in the filesystem itself
+ *         LINUX_EINVAL  - Given file exists but is not a link
+ *         LINUX_ENOENT  - No such link exists
+ */
+typedef int (*driver_readlink) (vRef* vref, const char* name, const char* buffer, int size);
+
 typedef struct FilesystemDriver_tag {
 	const char identifier[16];
 
-	driver_root   root;
-	driver_clone  clone;
-	driver_open   open;
-	driver_close  close;
-	driver_read   read;
-	driver_write  write;
-	driver_seek   seek;
-	driver_list   list;
-	driver_mkdir  mkdir;
-	driver_remove remove;
-	driver_stat   stat;
+	driver_root     root;
+	driver_clone    clone;
+	driver_open     open;
+	driver_close    close;
+	driver_read     read;
+	driver_write    write;
+	driver_seek     seek;
+	driver_list     list;
+	driver_mkdir    mkdir;
+	driver_remove   remove;
+	driver_stat     stat;
+	driver_readlink readlink;
 } FilesystemDriver;
 
 /**
@@ -276,7 +295,7 @@ void vfs_init();
 /**
  *
  */
-vRef vfs_open(vRef* relation, const char* path);
+vRef vfs_open(vRef* relation, const char* path, uint32_t flags);
 
 /**
  *

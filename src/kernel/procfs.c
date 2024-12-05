@@ -50,12 +50,26 @@ int procfs_stat(vRef* vref, vStat* stat) {
 	kprintf("procfs: stat\n");
 }
 
+int procfs_readlink(vRef* vref, const char* name, const char* buffer, int size) {
+	kprintf("procfs: readlink\n");
+}
+
 /* public */
 
 void procfs_load(FilesystemDriver* driver) {
 	memcpy(driver->identifier, "ProcFS", 6);
+
+	// export driver functions
 	driver->root = procfs_root;
 	driver->clone = procfs_clone;
 	driver->open = procfs_open;
 	driver->close = procfs_close;
+	driver->read = procfs_read;
+	driver->write = procfs_write;
+	driver->seek = procfs_seek;
+	driver->list = procfs_list;
+	driver->mkdir = procfs_mkdir;
+	driver->remove = procfs_remove;
+	driver->stat = procfs_stat;
+	driver->readlink = procfs_readlink;
 }
