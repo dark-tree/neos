@@ -259,6 +259,11 @@ typedef struct FilesystemDriver_tag {
 
 /**
  * @brief Get next path element
+ *
+ * @param[in] path    Path object to get the next element of.
+ * @param[out] buffer Buffer to write the next name into.
+ *
+ * @return 1 on success, 0 if nothing was written to buffer.
  */
 int vfs_resolve(vPath* path, char* buffer);
 
@@ -268,28 +273,91 @@ int vfs_resolve(vPath* path, char* buffer);
  */
 void vfs_init();
 
+/**
+ *
+ */
 vRef vfs_open(vRef* relation, const char* path);
 
+/**
+ *
+ */
+int vfs_close(vRef* vref);
 
+/**
+ *
+ */
+int vfs_read(vRef* vref, void* buffer, uint32_t size, uint32_t count);
+
+/**
+ *
+ */
+int vfs_write(vRef* vref, void* buffer, uint32_t size, uint32_t count);
+
+/**
+ *
+ */
+int vfs_seek(vRef* vref, int offset, int whence);
+
+/**
+ *
+ */
+int vfs_list(vRef* vref, vEntry* entries, int max);
+
+/**
+ *
+ */
+int vfs_mkdir(vRef* vref, const char* name);
+
+/**
+ *
+ */
+int vfs_remove(vRef* vref, bool rmdir);
+
+/**
+ *
+ */
+int vfs_stat(vRef* vref, vStat* stat);
+
+/**
+ * @brief Get a reference to the root of the VFS, this can be then used to oepn paths
+ * @return Root VFS
+ */
 vRef vfs_root();
 
-///**
-// * @brief Check if the flags allow writing.
-// * @return 1 if the file can be writen to, 0 otherwise.
-// */
-//bool fdev_open_can_write(int open_flags);
+/**
+ * @brief Check if the flags allow writing.
+ *
+ * @param[in] open_flags open() flags
+ *
+ * @return 1 if the file can be writen to, 0 otherwise.
+ */
+bool vfs_iswriteable(int open_flags);
 
-///**
-// * @brief Check if the flags allow reading.
-// * @return 1 if the file can be read from, 0 otherwise.
-// */
-//bool fdev_open_can_read(int open_flags);
+/**
+ * @brief Check if the flags allow reading.
+ *
+ * @param[in] open_flags open() flags
+ *
+ * @return 1 if the file can be read from, 0 otherwise.
+ */
+bool vfs_isreadable(int open_flags);
 
 /**
  * @brief Mount the given driver into the filesystem.
+ *
+ * @param[in] path Path to mount to.
+ * @param[in] value The driver to mount.
+ *
  * @return 1 if the driver was mounted, 0 otherwise.
  */
 int vfs_mount(const char* path, FilesystemDriver* value);
 
-
+/**
+ * @brief Print the VFS tree
+ *
+ * @param[in] node Node to print, set to NULL to print from root.
+ * @param[in] depth The print depth, set to 0.
+ *
+ * @return None.
+ */
 void vfs_print(vNode* node, int depth);

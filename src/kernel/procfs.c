@@ -34,10 +34,6 @@ int procfs_seek(vRef* vref, int offset, int whence) {
 	kprintf("procfs: seek %d\n", offset);
 }
 
-int procfs_tell(vRef* vref) {
-	kprintf("procfs: tell\n");
-}
-
 int procfs_list(vRef* vref, vEntry* entries, int max) {
 	kprintf("procfs: list\n");
 }

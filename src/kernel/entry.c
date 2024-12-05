@@ -8,6 +8,7 @@
 #include "mem.h"
 #include "vfs.h"
 #include "memory.h"
+#include "procfs.h"
 
 extern char asm_test();
 extern void pic_disable();
@@ -42,8 +43,7 @@ void start() {
 	procfs_load(&procfs);
 	vfs_mount("/", &procfs);
 
-	vRef root = vfs_root();
-	vfs_print(root.node, 0);
+	vfs_print(NULL, 0);
 
 	kprintf("System ready!\n");
 
@@ -53,7 +53,7 @@ void start() {
 //	root.driver = NULL;
 //	root.state = NULL;
 
-
+	vRef root = vfs_root();
 	//vfs_open(root, "/testing/omg/tmp/test.txt");
 	vfs_open(&root, "./abcd/../tmp/haha.txt");
 

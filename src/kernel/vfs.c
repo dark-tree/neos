@@ -87,6 +87,29 @@ static void vfs_refcpy(vRef* vref, vRef* src) {
 	}
 }
 
+static int vfs_findchld(vNode** node, const char* name) {
+	vNode* child = (*node)->child;
+
+	while (true) {
+
+		if (streq(child->name, name)) {
+			*node = child;
+			return 1;
+		}
+
+		if (child->sibling != NULL) {
+			child = child->sibling;
+			continue;
+		}
+
+		break;
+
+	}
+
+	*node = child;
+	return 0;
+}
+
 static void vfs_enter(vRef* vref, const char* part) {
 
 	vNode* node = vref->node;
@@ -129,6 +152,14 @@ static void vfs_enter(vRef* vref, const char* part) {
 
 vRef vfs_root() {
 	return vfs_root_ref;
+}
+
+bool vfs_iswriteable(int open_flags) {
+	return (open_flags & OPEN_RDWR) || (open_flags & OPEN_WRONLY);
+}
+
+bool vfs_isreadable(int open_flags) {
+	return (open_flags & OPEN_RDWR) || !(open_flags & OPEN_WRONLY);
 }
 
 vRef vfs_open(vRef* relation, const char* path) {
@@ -214,29 +245,6 @@ int vfs_resolve(vPath* path, char* buffer) {
 	return 1;
 }
 
-int vfs_findchld(vNode** node, const char* name) {
-	vNode* child = (*node)->child;
-
-	while (true) {
-
-		if (streq(child->name, name)) {
-			*node = child;
-			return 1;
-		}
-
-		if (child->sibling != NULL) {
-			child = child->sibling;
-			continue;
-		}
-
-		break;
-
-	}
-
-	*node = child;
-	return 0;
-}
-
 void vfs_init() {
 	vfs_root_node.child = NULL;
 	vfs_root_node.sibling = NULL;
@@ -288,6 +296,10 @@ int vfs_mount(const char* path, FilesystemDriver* driver) {
 }
 
 void vfs_print(vNode* node, int depth) {
+
+	if (node == NULL) {
+		node = &vfs_root_node;
+	}
 
 	for (int i = 0; i < depth; i ++) {
 		kprintf("%c ", 0xB3);
