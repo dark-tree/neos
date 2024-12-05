@@ -295,7 +295,7 @@ void vfs_init();
 /**
  *
  */
-vRef vfs_open(vRef* relation, const char* path, uint32_t flags);
+int vfs_open(vRef* vref, vRef* relation, const char* path, uint32_t flags);
 
 /**
  *

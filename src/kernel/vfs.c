@@ -44,20 +44,26 @@
 static vNode vfs_root_node;
 static vRef vfs_root_ref;
 
-static void vfs_update(vRef* vref) {
+static int vfs_update(vRef* vref) {
 
 	if ((vref->driver != NULL) && (vref->driver != vref->node->driver)) {
 		kprintf(" * driver %s: close\n", vref->driver->identifier);
+		int res = vref->driver->close(vref);
+
+		if (res) {
+			return res;
+		}
+
 		goto enable;
 	}
 
 	if (vref->driver == NULL) {
 		enable:
 		vref->driver = vref->node->driver;
-
-		kprintf(" * driver %s: root\n", vref->driver->identifier);
-		return;
+		return vref->driver->root(vref);
 	}
+
+	return 0;
 
 }
 
@@ -110,43 +116,48 @@ static int vfs_findchld(vNode** node, const char* name) {
 	return 0;
 }
 
-static void vfs_enter(vRef* vref, const char* part) {
+static int vfs_enter(vRef* vref, const char* part, int flags) {
 
 	vNode* node = vref->node;
 
 	if (streq(part, ".")) {
-		return;
+		return 0;
 	}
 
 	if (streq(part, "..")) {
 
 		if (vref->offset > 0) {
 			vref->offset --;
-			vfs_update(vref);
-			//vref->driver->open(vref, );
-			kprintf(" * driver %s: open %s\n", vref->driver->identifier, part);
-			return;
+			int res = vfs_update(vref);
+
+			if (res) {
+				return res;
+			}
+
+			return vref->driver->open(vref, part, flags);
 		}
 
 		// change mount point
 		// this is safe, root loopbacks back onto itself
 		vref->node = vref->node->parent;
-		vfs_update(vref);
-		return;
+		return vfs_update(vref);
 	}
 
 	if ((vref->offset == 0) && vfs_findchld(&node, part)) {
 		vref->node = node;
-		vfs_update(vref);
-		return;
+		return vfs_update(vref);
 	}
 
 	// step into the unknown
 	vref->offset ++;
 
-	vfs_update(vref);
-	kprintf(" * driver %s: open %s\n", vref->driver->identifier, part);
+	int res = vfs_update(vref);
 
+	if (res) {
+		return res;
+	}
+
+	return vref->driver->open(vref, part, flags);
 }
 
 /* public */
@@ -163,31 +174,45 @@ bool vfs_isreadable(int open_flags) {
 	return (open_flags & OPEN_RDWR) || !(open_flags & OPEN_WRONLY);
 }
 
-vRef vfs_open(vRef* relation, const char* path, uint32_t flags) {
+int vfs_open(vRef* vref, vRef* relation, const char* path, uint32_t flags) {
 
-	kprintf("open '%s'\n", path);
+	kprintf("vfs_open: '%s'\n", path);
 
-	char buffer[FILE_MAX_NAME];
+	bool enter = false;
+	char front[FILE_MAX_NAME];
+	char back[FILE_MAX_NAME];
 
 	vPath vpth;
 	vpth.string = path;
 	vpth.offset = 0;
 	vpth.resolves = 0;
 
-	vRef vref;
-
 	// absolute path
 	if (path[0] == '/') {
-		vfs_refcpy(&vref, &vfs_root_ref);
+		vfs_refcpy(vref, &vfs_root_ref);
 	} else {
-		vfs_refcpy(&vref, relation);
+		vfs_refcpy(vref, relation);
 	}
 
-	while (vfs_resolve(&vpth, buffer)) {
-		vfs_enter(&vref, buffer);
+	while (vfs_resolve(&vpth, front)) {
+
+		if (enter) {
+			int res = vfs_enter(vref, back, OPEN_DIRECTORY | (flags & OPEN_NOFOLLOW));
+
+			if (res) {
+				return res;
+			}
+		}
+
+		enter = true;
+		memcpy(back, front, FILE_MAX_NAME);
 	}
 
-	return vref;
+	if (enter) {
+		return vfs_enter(vref, back, flags);
+	}
+
+	return 0;
 
 }
 
