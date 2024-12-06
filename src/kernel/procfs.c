@@ -1,6 +1,8 @@
 #include "procfs.h"
 #include "kmalloc.h"
 #include "errno.h"
+#include "print.h"
+#include "memory.h"
 
 /* private */
 
@@ -8,50 +10,62 @@
 
 int procfs_root(vRef* dst) {
 	kprintf("procfs: root\n");
+	return 0; // TODO
 }
 
 int procfs_clone(vRef* dst, vRef* src) {
 	kprintf("procfs: clone\n");
+	return 0; // TODO
 }
 
-int procfs_open(vRef* vref, const char* part, uint32_t flags) {
-	kprintf("procfs: open %s\n", part);
+int procfs_open(vRef* vref, const char* basename, uint32_t flags) {
+	kprintf("procfs: open %s\n", basename);
+	return 0; // TODO
 }
 
 int procfs_close(vRef* vref) {
 	kprintf("procfs: close\n");
+	return 0;
 }
 
-int procfs_read(vRef* vref, void* buffer, uint32_t size, uint32_t count) {
-	kprintf("procfs: read %d\n", size * count);
+int procfs_read(vRef* vref, void* buffer, uint32_t size) {
+	kprintf("procfs: read %d\n", size);
+	return LINUX_EIO; // TODO
 }
 
-int procfs_write(vRef* vref, void* buffer, uint32_t size, uint32_t count) {
-	kprintf("procfs: write %d\n", size * count);
+int procfs_write(vRef* vref, void* buffer, uint32_t size) {
+	kprintf("procfs: write %d\n", size);
+	return LINUX_EROFS; // never allow writing to ProcFS
 }
 
 int procfs_seek(vRef* vref, int offset, int whence) {
 	kprintf("procfs: seek %d\n", offset);
+	return LINUX_EIO; // TODO
 }
 
 int procfs_list(vRef* vref, vEntry* entries, int max) {
-	kprintf("procfs: list\n");
+	kprintf("procfs: list\n"); // TODO
+	return LINUX_EIO;
 }
 
 int procfs_mkdir(vRef* vref, const char* name) {
 	kprintf("procfs: mkdir %s\n", name);
+	return LINUX_EROFS; // never allow writing to ProcFS
 }
 
 int procfs_remove(vRef* vref, bool rmdir) {
 	kprintf("procfs: remove\n");
+	return LINUX_EROFS; // never allow writing to ProcFS
 }
 
 int procfs_stat(vRef* vref, vStat* stat) {
 	kprintf("procfs: stat\n");
+	return LINUX_EIO; // TODO
 }
 
 int procfs_readlink(vRef* vref, const char* name, const char* buffer, int size) {
 	kprintf("procfs: readlink\n");
+	return LINUX_EIO; // TODO
 }
 
 /* public */

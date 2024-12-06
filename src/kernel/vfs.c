@@ -3,6 +3,7 @@
 #include "kmalloc.h"
 #include "print.h"
 #include "util.h"
+#include "errno.h"
 
 /**
  * Example directory structure:
@@ -47,7 +48,6 @@ static vRef vfs_root_ref;
 static int vfs_update(vRef* vref) {
 
 	if ((vref->driver != NULL) && (vref->driver != vref->node->driver)) {
-		kprintf(" * driver %s: close\n", vref->driver->identifier);
 		int res = vref->driver->close(vref);
 
 		if (res) {
@@ -89,7 +89,7 @@ static void vfs_refcpy(vRef* vref, vRef* src) {
 		vref->driver = src->driver;
 		//src->driver->clone(vref, src);
 
-		kprintf(" * driver %s: clone\n", vref->driver->identifier);
+		kprintf(" * VFS %s: clone\n", vref->driver->identifier);
 	}
 }
 
@@ -186,6 +186,7 @@ int vfs_open(vRef* vref, vRef* relation, const char* path, uint32_t flags) {
 	vpth.string = path;
 	vpth.offset = 0;
 	vpth.resolves = 0;
+	vpth.errno = 0;
 
 	// absolute path
 	if (path[0] == '/') {
@@ -196,12 +197,22 @@ int vfs_open(vRef* vref, vRef* relation, const char* path, uint32_t flags) {
 
 	while (vfs_resolve(&vpth, front)) {
 
+		// check if error occured in resolve
+		if (vpth.errno) {
+			return vpth.errno;
+		}
+
 		if (enter) {
 			int res = vfs_enter(vref, back, OPEN_DIRECTORY | (flags & OPEN_NOFOLLOW));
 
 			if (res) {
 				return res;
 			}
+		}
+
+		// took too many resolves to reach the end
+		if (vpth.resolves > PATH_MAX_RESOLVES) {
+			return LINUX_ELOOP;
 		}
 
 		enter = true;
@@ -214,6 +225,78 @@ int vfs_open(vRef* vref, vRef* relation, const char* path, uint32_t flags) {
 
 	return 0;
 
+}
+
+int vfs_close(vRef* vref) {
+	if (vref->driver) {
+		return vref->driver->close(vref);
+	}
+
+	// TODO No driver at leaf node, return error?
+	return 0;
+}
+
+int vfs_read(vRef* vref, void* buffer, uint32_t size) {
+	if (vref->driver) {
+		return vref->driver->read(vref, buffer, size);
+	}
+
+	// TODO No driver at leaf node, return error?
+	return 0;
+}
+
+int vfs_write(vRef* vref, void* buffer, uint32_t size) {
+	if (vref->driver) {
+		return vref->driver->write(vref, buffer, size);
+	}
+
+	// TODO No driver at leaf node, return error?
+	return 0;
+}
+
+int vfs_seek(vRef* vref, int offset, int whence) {
+	if (vref->driver) {
+		return vref->driver->seek(vref, offset, whence);
+	}
+
+	// TODO No driver at leaf node, return error?
+	return 0;
+}
+
+int vfs_list(vRef* vref, vEntry* entries, int max) {
+	if (vref->driver) {
+		return vref->driver->list(vref, entries, max);
+	}
+
+	// TODO No driver at leaf node, return error?
+	return 0;
+}
+
+int vfs_mkdir(vRef* vref, const char* name) {
+	if (vref->driver) {
+		return vref->driver->mkdir(vref, name);
+	}
+
+	// TODO No driver at leaf node, return error?
+	return 0;
+}
+
+int vfs_remove(vRef* vref, bool rmdir) {
+	if (vref->driver) {
+		return vref->driver->remove(vref, rmdir);
+	}
+
+	// TODO No driver at leaf node, return error?
+	return 0;
+}
+
+int vfs_stat(vRef* vref, vStat* stat) {
+	if (vref->driver) {
+		return vref->driver->stat(vref, stat);
+	}
+
+	// TODO No driver at leaf node, return error?
+	return 0;
 }
 
 int vfs_resolve(vPath* path, char* buffer) {
@@ -244,6 +327,12 @@ int vfs_resolve(vPath* path, char* buffer) {
 	// match the name until we reach the end of section (start of next section or \0)
 	while (true) {
 
+		// filename limit exceded, we will handle it as if the section ended here
+		if (i >= last) {
+			path->errno = LINUX_ENAMETOOLONG;
+			break;
+		}
+
 		const char chr = path->string[path->offset ++];
 
 		// handle interpath separator and string end
@@ -256,11 +345,6 @@ int vfs_resolve(vPath* path, char* buffer) {
 
 		// copy into filename buffer
 		buffer[i ++] = chr;
-
-		// filename limit exceded, we will handle it as if the section ended here
-		if (i >= last) {
-			break;
-		}
 
 	}
 

@@ -57,7 +57,9 @@ void start() {
 	//vfs_open(root, "/testing/omg/tmp/test.txt");
 	vRef ref;
 
-	vfs_open(&ref, &root, "./abcd/../tmp/haha.txt", 0);
+	int res = vfs_open(&ref, &root, "./abcd/../tmp/haha.txt", 0);
+
+	kprintf("Return: %d\n", res);
 
 	//asm_test();
 

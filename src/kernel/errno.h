@@ -11,3 +11,4 @@
 #define LINUX_EMFILE       24 /* Too many open files */
 #define LINUX_ENAMETOOLONG 36 /* File name too long */
 #define LINUX_ELOOP        40 /* Too many levels of symbolic links */
+#define LINUX_EROFS        30 /* Write requested to a read only filesystem */

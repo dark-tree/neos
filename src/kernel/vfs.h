@@ -55,6 +55,9 @@ typedef struct {
 	// number of path resolves done
 	int resolves;
 
+	// path resolution error status
+	int errno;
+
 } vPath;
 
 /**
@@ -138,7 +141,7 @@ typedef int (*driver_clone) (vRef* dst, vRef* src);
  *         LINUX_EEXIST  - File exists while creation was mandated (OPEN_EXCL)
  *         LINUX_ENOTDIR - Target is not a directory while OPEN_DIRECTORY was set
  */
-typedef int (*driver_open) (vRef* vref, const char* part, uint32_t flags);
+typedef int (*driver_open) (vRef* vref, const char* basename, uint32_t flags);
 
 /**
  * @brief Close and dealocate vRef
@@ -160,7 +163,7 @@ typedef int (*driver_close) (vRef* vref);
  *         LINUX_EINVAL  - Can't read from the given vRef
  *         LINUX_EISDIR  - vRef is a directory
  */
-typedef int (*driver_read) (vRef* vref, void* buffer, uint32_t count);
+typedef int (*driver_read) (vRef* vref, void* buffer, uint32_t size);
 
 /**
  * @brief Write count bytes to vRef from buffer
@@ -173,7 +176,7 @@ typedef int (*driver_read) (vRef* vref, void* buffer, uint32_t count);
  *         LINUX_EINVAL  - Can't write to the give vRef
  *         LINUX_EISDIR  - vRef is a directory
  */
-typedef int (*driver_write) (vRef* vref, void* buffer, uint32_t count);
+typedef int (*driver_write) (vRef* vref, void* buffer, uint32_t size);
 
 /**
  * @brief Manipulate the file cursor
@@ -260,7 +263,7 @@ typedef int (*driver_stat) (vRef* vref, vStat* stat);
 typedef int (*driver_readlink) (vRef* vref, const char* name, const char* buffer, int size);
 
 typedef struct FilesystemDriver_tag {
-	const char identifier[16];
+	char identifier[16];
 
 	driver_root     root;
 	driver_clone    clone;
@@ -305,12 +308,12 @@ int vfs_close(vRef* vref);
 /**
  *
  */
-int vfs_read(vRef* vref, void* buffer, uint32_t size, uint32_t count);
+int vfs_read(vRef* vref, void* buffer, uint32_t size);
 
 /**
  *
  */
-int vfs_write(vRef* vref, void* buffer, uint32_t size, uint32_t count);
+int vfs_write(vRef* vref, void* buffer, uint32_t size);
 
 /**
  *
