@@ -35,10 +35,9 @@ OC = objcopy -O binary
 .PHONY : clean all run debug
 
 # Create the build directory
-build:
-	mkdir build
-	mkdir build/boot
-	mkdir build/kernel
+build: src/kernel/systable.h
+	mkdir -p build/boot
+	mkdir -p build/kernel
 
 # Compile the bootloader, first stage
 build/boot/load.bin: build src/boot/load.asm src/link/load.ld
@@ -78,10 +77,15 @@ build/floppy.img: build build/boot/load.bin build/boot/start.bin build/kernel/ke
 
 # Wrap into a ISO image file
 build/final.iso: build build/floppy.img
-	mkdir iso
+	mkdir ./build/iso
 	cp build/floppy.img iso/
 	genisoimage -quiet -V 'neos' -input-charset iso8859-1 -o build/final.iso -b floppy.img -hide floppy.img iso/
-	rm -rf ./iso
+	rm -rf ./build/iso
+
+# Rebuild syscall table
+src/kernel/systable.h: util/sysgen.py
+	rm -f src/kernel/systable.h
+	python3 util/sysgen.py > src/kernel/systable.h
 
 # Build all
 all: build/final.iso
