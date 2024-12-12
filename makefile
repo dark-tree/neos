@@ -22,6 +22,7 @@ KERNEL_CC = \
 	build/kernel/interrupt.o \
 	build/kernel/syscall.o \
 	build/kernel/mem.o \
+	build/kernel/rivendell.o \
 	build/kernel/vfs.o \
 	build/kernel/procfs.o
 
