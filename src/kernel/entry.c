@@ -27,8 +27,8 @@ void start() {
 
 	// Init memory system and make room for the kernel
 	mem_init(0xFFFFF + 1 /* TODO: remove when fix is merged */);
-  pic_disable();
-  int_init();
+	pic_disable();
+	int_init();
 
 //	kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m%#0.8x\e[m again!\n", "sweet", 'r', -1920);
 
@@ -57,11 +57,11 @@ void start() {
 
 	int res = vfs_open(&ref, &root, "./abcd/../tmp/haha.txt", 0);
 	kprintf("Return: %d\n", res);
-  
-  scheduler_init();
 
-  scheduler_create_process(-1, getprocess1());
-  scheduler_create_process(-1, getprocess2());
+	scheduler_init();
+
+	scheduler_create_process(-1, getprocess1());
+	scheduler_create_process(-1, getprocess2());
 
 	// never return to the bootloader
 	halt();

@@ -1,6 +1,5 @@
-#ifndef SCHEDULER_H
-#define SCHEDULER_H
-
+#pragma once
+#include "vfs.h"
 
 typedef enum {
     RUNNABLE,
@@ -8,7 +7,6 @@ typedef enum {
     STOPPED,
     ZOMBIE
 } ProcessState;
-
 
 typedef struct {
     bool exists;
@@ -29,7 +27,7 @@ extern void scheduler_init();
 
 void scheduler_new_entry(int parent_pid, void* stack, void* process_memory);
 
-void scheduler_create_process(int parent_pid, void* process_memory);
+int scheduler_create_process(int parent_pid, void* process_memory);
 
 int scheduler_context_switch(void* old_stack);
 
@@ -44,6 +42,3 @@ int scheduler_fput(vRef vref, int pid);
 vRef* scheduler_fget(int pid, int fd);
 
 int scheduler_fremove(int pid, int fd);
-
-
-#endif // SCHEDULER_H
