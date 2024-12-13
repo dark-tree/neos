@@ -16,6 +16,7 @@ typedef struct {
     int parent_index;
     vRef* files;
     bool* fileExists;
+    vRef cwd;
 } ProcessDescriptor;
 
 

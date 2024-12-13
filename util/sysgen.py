@@ -8,7 +8,9 @@ output = ""
 
 # Add all syscalls implemented in C here
 spec_impl = [
-	"sys_write"
+	"sys_write",
+	"sys_open",
+	"sys_read"
 ]
 
 # Add all syscalls implemented in ASM at the interrupt level here

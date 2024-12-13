@@ -22,12 +22,10 @@ global getprocess2
 process1:
 	mov EAX, 0
 
-proc1ptl:
-
 	; open("abc/foo/test.txt", O_WRONL | O_CREAT, 0);
 	mov eax, 0x05      ; sys_open
 	mov ebx, test_path ; Path
-	mov ecx, 16        ; Length
+	mov ecx, 0x201     ; Flags
 	mov edx, 0         ; Mode
 	int 0x80
 
@@ -38,13 +36,15 @@ proc1ptl:
 	mov edx, 6         ; Length
 	int 0x80
 
-	add EAX, 1
-	push EAX
-	mov ECX, process1text
-	push ECX
-	call kprintf
-	add ESP, 4
-	pop EAX
+
+proc1ptl:
+	;add EAX, 1
+	;push EAX
+	;mov ECX, process1text
+	;push ECX
+	;call kprintf
+	;add ESP, 4
+	;pop EAX
 
 jmp proc1ptl
 
@@ -59,13 +59,13 @@ process2:
 	mov EAX, 0
 proc2ptl:
 
-	add EAX, 1
-	push EAX
-	mov ECX, process2text
-	push ECX
-	call kprintf
-	add ESP, 4
-	pop EAX
+	;add EAX, 1
+	;push EAX
+	;mov ECX, process2text
+	;push ECX
+	;call kprintf
+	;add ESP, 4
+	;pop EAX
 
 jmp proc2ptl
 
