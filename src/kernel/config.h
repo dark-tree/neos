@@ -36,6 +36,18 @@
 #define MEMORY_MAP_RAM 0x500
 
 /**
+ * @brief Initial size of the process vector
+ *        inside the sheduler, that holds process descriptors.
+ */
+#define INITIAL_PROCESS_TABLE_SIZE 2
+
+/**
+ * @brief The maximal number of file
+ *        descriptors per process.
+ */
+#define MAX_FILES_PER_PROCESS 1024
+
+/**
  * @brief The maximum length (in characters) of a single path element (file or
  *        directory name) in a path string, including the null-byte
  */

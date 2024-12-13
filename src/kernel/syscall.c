@@ -91,7 +91,6 @@ int sys_write(int fd, char* buffer, int bytes) {
 /* public */
 
 int sys_linux(int eax, int ebx, int ecx, int edx, int esi, int edi) {
-
 	if (eax >= SYS_LINUX_SIZE) {
 		panic("Invalid syscall number!");
 	}

@@ -8,6 +8,8 @@
 #include "pic.h"
 #include "syscall.h"
 
+static void context_switch(int number, int error, int* eax, int ecx, int edx, int ebx, int esi, int edi);
+
 /* private */
 
 // Used by the wait subsystem
@@ -57,7 +59,7 @@ void int_wait() {
 	}
 }
 
-extern int_go_bonkers();
+extern int int_go_bonkers();
 
 void int_gone_bonkers() {
 	panic("Just a test, panic() called from int_gone_bonkers()");
@@ -78,9 +80,10 @@ void int_init() {
 		isr_register(i, int_debug_handle);
 	}
 
-	isr_register(0x20, NULL);             // stop the timer spam
-	isr_register(0x01, int_go_bonkers);   // the forbidden interrupt:tm:
+    //isr_register(0x20, NULL);             // stop the timer spam
+    //isr_register(0x01, int_go_bonkers);   // the forbidden interrupt:tm:
 	isr_register(0x80, int_linux_handle); // forward syscalls to the syscall system
+    isr_register(0x20, context_switch);
 
 	// Point the processor at the IDT and enable interrupts
 	idtr_store(MEMORY_MAP_IDT, 0x81);
