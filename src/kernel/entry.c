@@ -61,7 +61,7 @@ void start() {
 
 	kprintf("Return: %d\n", res);
 
-	//asm_test();
+	asm_test();
 
 	// never return to the bootloader
 	halt();
