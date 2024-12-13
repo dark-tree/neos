@@ -59,3 +59,13 @@ int strlen(const char* cstr);
  * @return Returns The length of the null-terminated wide string.
  */
 int wstrlen(const short* wstr);
+
+/**
+ * @brief Check if two strings are equal
+ *
+ * @param[in] lcstr Pointer to the null-terminated c-string.
+ * @param[in] rcstr Pointer to the null-terminated c-string.
+ *
+ * @return Returns 1 if the strings are equal, 0 otherwise.
+ */
+int streq(const char* lcstr, const char* rcstr);

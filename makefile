@@ -23,23 +23,25 @@ KERNEL_CC = \
 	build/kernel/math.o \
 	build/kernel/interrupt.o \
 	build/kernel/syscall.o \
-	build/kernel/mem.o\
-	build/kernel/scheduler.o
+	build/kernel/scheduler.o \
+	build/kernel/mem.o \
+	build/kernel/rivendell.o \
+	build/kernel/vfs.o \
+	build/kernel/procfs.o
 
 # Configuration
-CC_FLAGS = -nostdinc -fomit-frame-pointer -fno-builtin -nodefaultlibs -nostdlib -ffreestanding
-LD = ld -melf_i386 -nostdlib
-CC = gcc -m32 -fno-pie -std=gnu99 -Wall -Wextra $(CC_FLAGS) -O2 -c
+CC_FLAGS = -nostdinc -fomit-frame-pointer -fno-builtin -nodefaultlibs -nostdlib -ffreestanding -g
+LD = ld -melf_i386 -nostdlib -g
+CC = gcc -m32 -fno-pie -std=gnu99 -Wall -Wextra $(CC_FLAGS) -O0 -c
 AS = nasm -f elf32
 OC = objcopy -O binary
 
 .PHONY : clean all run debug
 
 # Create the build directory
-build:
-	mkdir build
-	mkdir build/boot
-	mkdir build/kernel
+build: src/kernel/systable.h
+	mkdir -p build/boot
+	mkdir -p build/kernel
 
 # Compile the bootloader, first stage
 build/boot/load.bin: build src/boot/load.asm src/link/load.ld
@@ -61,6 +63,10 @@ $(KERNEL_CC): build/kernel/%.o: src/kernel/%.c build
 $(KERNEL_AS): build/kernel/%.o: src/kernel/%.asm build
 	$(AS) $< -o $@
 
+# Construct the symbol file
+build/kernel.dwarf:
+	$(LD) -T src/link/debug.ld -o build/kernel.dwarf $(KERNEL_CC) $(KERNEL_AS)
+
 # Compile the kernel to a flat binary
 build/kernel/kernel.bin: build src/link/kernel.ld $(KERNEL_AS) $(KERNEL_CC)
 	$(LD) -T src/link/kernel.ld -o build/kernel/kernel.o $(KERNEL_CC) $(KERNEL_AS)
@@ -75,10 +81,15 @@ build/floppy.img: build build/boot/load.bin build/boot/start.bin build/kernel/ke
 
 # Wrap into a ISO image file
 build/final.iso: build build/floppy.img
-	mkdir iso
-	cp build/floppy.img iso/
-	genisoimage -quiet -V 'neos' -input-charset iso8859-1 -o build/final.iso -b floppy.img -hide floppy.img iso/
-	rm -rf ./iso
+	mkdir -p build/iso
+	cp build/floppy.img build/iso/
+	genisoimage -quiet -V 'neos' -input-charset iso8859-1 -o build/final.iso -b floppy.img -hide floppy.img build/iso/
+	rm -rf ./build/iso
+
+# Rebuild syscall table
+src/kernel/systable.h: util/sysgen.py
+	rm -f src/kernel/systable.h
+	python3 util/sysgen.py > src/kernel/systable.h
 
 # Build all
 all: build/final.iso
@@ -93,9 +104,9 @@ run: build/final.iso
 	qemu-system-i386 -monitor stdio -cdrom ./build/final.iso -boot a -d cpu_reset -D ./output
 
 # Invoke QEMU and wait for GDB
-debug: build/final.iso
+debug: build/final.iso build/kernel.dwarf
 	qemu-system-i386 -singlestep -cdrom ./build/final.iso -boot a -s -S &
-	gdb -ex 'target remote localhost:1234' -ex 'break *0x8000' -ex 'c'
+	gdb -ex 'target remote localhost:1234' -ex 'symbol-file build/kernel.dwarf' -ex 'break *0x8000' -ex 'c'
 
 disasm: build/bootloader.bin
 	ndisasm -b 16 -o 7c00h ./build/bootloader.bin
