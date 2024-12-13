@@ -78,9 +78,9 @@ build/floppy.img: build build/boot/load.bin build/boot/start.bin build/kernel/ke
 
 # Wrap into a ISO image file
 build/final.iso: build build/floppy.img
-	mkdir ./build/iso
-	cp build/floppy.img iso/
-	genisoimage -quiet -V 'neos' -input-charset iso8859-1 -o build/final.iso -b floppy.img -hide floppy.img iso/
+	mkdir -p build/iso
+	cp build/floppy.img build/iso/
+	genisoimage -quiet -V 'neos' -input-charset iso8859-1 -o build/final.iso -b floppy.img -hide floppy.img build/iso/
 	rm -rf ./build/iso
 
 # Rebuild syscall table

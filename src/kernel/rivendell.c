@@ -2,18 +2,10 @@
 #include "rivendell.h"
 #include "print.h"
 #include "memory.h"
+#include "kmalloc.h"
+#include "math.h"
 
 /* private */
-
-uint32_t min(uint32_t a, uint32_t b) {
-	if (a < b) return a;
-	return b;
-}
-
-uint32_t max(long a, long b) {
-	if (a > b) return a;
-	return b;
-}
 
 typedef struct {
 	uint32_t file_offset;
@@ -128,18 +120,18 @@ static int elf_checkident(Elf32_Ident* ident) {
 	return 0;
 }
 
-static int elf_segcpy(FILE* file, void* image, uint32_t mount, ImageSegment* segment) {
+static int elf_segcpy(vRef* vref, void* image, uint32_t mount, ImageSegment* segment) {
 
 	// seek to the segment contents
-	fseek(file, segment->file_offset, SEEK_SET);
+	vfs_seek(vref, segment->file_offset, SEEK_SET);
 
 	uint32_t address = segment->mem_offset - mount;
 	uint32_t content = min(segment->file_size, segment->mem_size);
 	uint32_t padding = max(0, (long) segment->mem_size - (long) segment->file_size);
 
-	printf("[+0x%.8x] Copying %u file bytes, and %u null bytes\n", address, content, padding);
+	kprintf("[+0x%.8x] Copying %u file bytes, and %u null bytes\n", address, content, padding);
 
-	if (fread(image + address, content, 1, file) == 0) {
+	if (vfs_read(vref, image + address, content) == 0) {
 		return ELF_READ_ERROR;
 	}
 
@@ -147,15 +139,15 @@ static int elf_segcpy(FILE* file, void* image, uint32_t mount, ImageSegment* seg
 	return ELF_SUCCESS;
 }
 
-static int elf_segments(FILE* file, const Elf32_Ehdr* header, ProgramImage* program) {
+static int elf_segments(vRef* vref, const Elf32_Ehdr* header, ProgramImage* program) {
 
-	printf("\nSegments: \n");
-	printf("\e[1m   type align    offset   vaddr    filesz   memsz\e[m\n");
+	kprintf("\nSegments: \n");
+	kprintf("\e[1m   type align    offset   vaddr    filesz   memsz\e[m\n");
 
 	// copy of loadable segments for future use
 	// used to not read the file multiple times
 	int phlcnt = 0;
-	ImageSegment* phlptr = malloc(sizeof(ImageSegment) * header->phnum);
+	ImageSegment* phlptr = kmalloc(sizeof(ImageSegment) * header->phnum);
 
 	// memory bounds, needed for the final image allocation
 	uint32_t low = -1;
@@ -167,9 +159,9 @@ static int elf_segments(FILE* file, const Elf32_Ehdr* header, ProgramImage* prog
 		Elf32_Phdr entry;
 
 		// seek to the Program Header Table entry
-		fseek(file, header->phoff + i * header->phentsize, SEEK_SET);
+		vfs_seek(vref, header->phoff + i * header->phentsize, SEEK_SET);
 
-		if (fread(&entry, sizeof(Elf32_Phdr), 1, file) == 0) {
+		if (vfs_read(vref, &entry, sizeof(Elf32_Phdr)) == 0) {
 			return ELF_READ_ERROR;
 		}
 
@@ -189,23 +181,23 @@ static int elf_segments(FILE* file, const Elf32_Ehdr* header, ProgramImage* prog
 			phlcnt ++;
 		}
 
-		printf(" * %s %.8x %.8x %.8x %.8x %.8x\n", elf_phtypestr(entry.type), entry.align, entry.offset, entry.vaddr, entry.filesz, entry.memsz);
+		kprintf(" * %s %.8x %.8x %.8x %.8x %.8x\n", elf_phtypestr(entry.type), entry.align, entry.offset, entry.vaddr, entry.filesz, entry.memsz);
 	}
 
 	uint32_t bytes = high - low;
 
-	printf("\nProgram: \n");
-	printf(" * phlcnt : %u\n", phlcnt);
-	printf(" * memory : %#.8x:%#.8x (%d bytes)\n", low, high, bytes);
+	kprintf("\nProgram: \n");
+	kprintf(" * phlcnt : %u\n", phlcnt);
+	kprintf(" * memory : %#.8x:%#.8x (%d bytes)\n", low, high, bytes);
 
-	printf("\n");
-	void* image = malloc(bytes);
+	kprintf("\n");
+	void* image = kmalloc(bytes);
 
 	for (int i = 0; i < phlcnt; i ++) {
 		int err;
 
-		if ((err = elf_segcpy(file, image, low, phlptr + i)) != ELF_SUCCESS) {
-			free(phlptr);
+		if ((err = elf_segcpy(vref, image, low, phlptr + i)) != ELF_SUCCESS) {
+			kfree(phlptr);
 			return err;
 		}
 	}
@@ -213,7 +205,7 @@ static int elf_segments(FILE* file, const Elf32_Ehdr* header, ProgramImage* prog
 	program->image = image;
 	program->mount = low;
 
-	free(phlptr);
+	kfree(phlptr);
 	return ELF_SUCCESS;
 
 }
@@ -230,11 +222,11 @@ const char* elf_err(int err) {
 }
 
 
-int elf_load(FILE* file, ProgramImage* image) {
+int elf_load(vRef* vref, ProgramImage* image) {
 
 	Elf32_Ehdr header;
 
-	if (fread(&header, sizeof(Elf32_Ehdr), 1, file) == 0) {
+	if (vfs_read(vref, &header, sizeof(Elf32_Ehdr)) == 0) {
 		return ELF_READ_ERROR;
 	}
 
@@ -268,15 +260,15 @@ int elf_load(FILE* file, ProgramImage* image) {
 //		return ELF_HEADER_ERROR;
 //	}
 
-	printf("Header: \n");
-	printf(" * entry    : %#.8x\n", (uint32_t) header.entry);
-	printf(" * phoff    : %#.8x (count: %.2d, size: %.2d)\n", (uint32_t) header.phoff, (uint32_t) header.phnum, (uint32_t) header.phentsize);
-	printf(" * shoff    : %#.8x (count: %.2d, size: %.2d)\n", (uint32_t) header.shoff, (uint32_t) header.shnum, (uint32_t) header.shentsize);
-	printf(" * shstrndx : %u\n", (uint32_t) header.shstrndx);
+	kprintf("Header: \n");
+	kprintf(" * entry    : %#.8x\n", (uint32_t) header.entry);
+	kprintf(" * phoff    : %#.8x (count: %.2d, size: %.2d)\n", (uint32_t) header.phoff, (uint32_t) header.phnum, (uint32_t) header.phentsize);
+	kprintf(" * shoff    : %#.8x (count: %.2d, size: %.2d)\n", (uint32_t) header.shoff, (uint32_t) header.shnum, (uint32_t) header.shentsize);
+	kprintf(" * shstrndx : %u\n", (uint32_t) header.shstrndx);
 
 	int err;
 
-	if ((err = elf_segments(file, &header, image)) != ELF_SUCCESS) {
+	if ((err = elf_segments(vref, &header, image)) != ELF_SUCCESS) {
 		return err;
 	}
 

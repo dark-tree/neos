@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "vfs.h"
 
 #define ELF_SUCCESS 0
 #define ELF_READ_ERROR -1
@@ -16,4 +17,4 @@ typedef struct {
 } ProgramImage;
 
 const char* elf_err(int err);
-int elf_load(FILE* file, ProgramImage* image);
+int elf_load(vRef* file, ProgramImage* image);
