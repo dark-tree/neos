@@ -4,34 +4,12 @@
 #include "routine.h"
 #include "print.h"
 
-#define MAX_FILES_PER_PROCESS 1024
+
 
 typedef struct {
    int i;
 } vRef;
 
-//Only for testing. Will be replace with an actual fire descriptor.
-typedef struct
-{
-
-} FileDescriptor;
-
-typedef enum {
-    RUNNABLE,
-    SLEEPING,
-    STOPPED,
-    ZOMBIE
-} ProcessState;
-
-
-typedef struct {
-    bool exists;
-    void* stack;
-    void* process_memory;
-    ProcessState state;
-    int parent_index;
-    vRef* files;
-} ProcessDescriptor;
 
 
 ProcessDescriptor* general_process_table;
@@ -64,6 +42,7 @@ int scheduler_load_process_info(ProcessDescriptor* processInfo, int pid)
     processInfo->state = general_process_table[pid].state;
     processInfo->parent_index = general_process_table[pid].parent_index;
     processInfo->files = general_process_table[pid].files;
+    processInfo->fileExists = general_process_table[pid].fileExists;
     return 0;
 }
 
@@ -122,9 +101,10 @@ void scheduler_new_entry(int parent_index, void* stack, void* process_memory)
     new_entry->parent_index = parent_index;
     new_entry->process_memory = process_memory;
     new_entry->files = kmalloc(sizeof(vRef)*MAX_FILES_PER_PROCESS);
+    new_entry->fileExists = kmalloc(sizeof(bool)*MAX_FILES_PER_PROCESS);
     for(int i=0; i<MAX_FILES_PER_PROCESS;i++)
     {
-        new_entry->files[i].i = NULL;
+        new_entry->fileExists[i] = false;
     }
     new_entry->state = RUNNABLE;
 }
@@ -142,8 +122,9 @@ int scheduler_kill_process(int pid)
     }
     pid--;
     scheduler_remove_entry(pid);
-    //kfree(general_process_table[index].process_memory);
+    //kfree(general_process_table[pid].process_memory);
     kfree(general_process_table[pid].files);
+    kfree(general_process_table[pid].fileExists);
     return 0;
 }
 
@@ -187,7 +168,7 @@ int scheduler_context_switch(void* old_stack)
     return (int)general_process_table[process_running].stack;
 }
 
-int scheduler_fassign(vRef vref, int pid)
+int scheduler_fput(vRef vref, int pid)
 {
     if(pid<=0)
     {
@@ -202,9 +183,10 @@ int scheduler_fassign(vRef vref, int pid)
     {
         for(int i = 0; i<MAX_FILES_PER_PROCESS; i++)
         {
-            if(general_process_table[index].files[i].i!=NULL)
+            if(!general_process_table[index].fileExists[i])
             {
                 general_process_table[index].files[i]=vref;
+                general_process_table[index].fileExists[i] = true;
                 return i+1;
             }
         }
@@ -212,32 +194,31 @@ int scheduler_fassign(vRef vref, int pid)
     return 0;
 }
 
-int scheduler_fget(vRef* vref, int pid, int fd)
+vRef* scheduler_fget(int pid, int fd)
 {
     if(pid<=0)
     {
-        return 1;
+        return NULL;
     }
     int index = pid-1;
     if(index>=process_count)
     {
-        return 1;
+        return NULL;
     }
     if(general_process_table[index].exists)
     {
         fd = fd-1;
         if(fd<0 || fd >=MAX_FILES_PER_PROCESS)
         {
-            return 1;
+            return NULL;
         }
-        if(general_process_table[index].files[fd].i==NULL)
+        if(!general_process_table[index].fileExists[fd])
         {
-            return 1;
+            return NULL;
         }
-        *vref = general_process_table[index].files[fd];
-        return 0;
+        return general_process_table[index].files + fd;
     }
-    return 1;
+    return NULL;
 }
 
 int scheduler_fremove(int pid, int fd)
@@ -258,11 +239,11 @@ int scheduler_fremove(int pid, int fd)
         {
             return 1;
         }
-        if(general_process_table[index].files[fd].i==NULL)
+        if(!general_process_table[index].fileExists[fd])
         {
             return 1;
         }
-        general_process_table[index].files[fd].i = NULL;
+        general_process_table[index].fileExists = false;
         return 0;
     }
     return 1;

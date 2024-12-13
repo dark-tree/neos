@@ -2,6 +2,25 @@
 #define SCHEDULER_H
 
 
+typedef enum {
+    RUNNABLE,
+    SLEEPING,
+    STOPPED,
+    ZOMBIE
+} ProcessState;
+
+
+typedef struct {
+    bool exists;
+    void* stack;
+    void* process_memory;
+    ProcessState state;
+    int parent_index;
+    vRef* files;
+    bool* fileExists;
+} ProcessDescriptor;
+
+
 extern int scheduler_get_current_pid();
 
 extern int get_index(int i);
@@ -20,9 +39,9 @@ int scheduler_load_process_info(ProcessDescriptor* processInfo, int pid);
 
 int scheduler_process_list(int* pid);
 
-int scheduler_fassign(vRef vref, int pid);
+int scheduler_fput(vRef vref, int pid);
 
-int scheduler_fget(vRef* vref, int pid, int fd);
+vRef* scheduler_fget(int pid, int fd);
 
 int scheduler_fremove(int pid, int fd);
 
