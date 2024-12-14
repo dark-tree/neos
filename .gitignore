@@ -1,1 +1,3 @@
 build/
+output
+src/kernel/systable.h

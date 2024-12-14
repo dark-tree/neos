@@ -48,3 +48,24 @@ void* memset(void* dst, uint8_t value, long bytes);
  * @return Returns The length of the null-terminated byte string.
  */
 int strlen(const char* cstr);
+
+/**
+ * @brief Returns the length of the given null-terminated wide utf-16 string,
+ *        that is, the number of characters in a character array whose first element is
+ *        pointed to by `wstr` up to and not including the first null character.
+ *
+ * @param[in] cstr Pointer to the null-terminated wide string.
+ *
+ * @return Returns The length of the null-terminated wide string.
+ */
+int wstrlen(const short* wstr);
+
+/**
+ * @brief Check if two strings are equal
+ *
+ * @param[in] lcstr Pointer to the null-terminated c-string.
+ * @param[in] rcstr Pointer to the null-terminated c-string.
+ *
+ * @return Returns 1 if the strings are equal, 0 otherwise.
+ */
+int streq(const char* lcstr, const char* rcstr);

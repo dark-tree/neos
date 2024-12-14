@@ -39,9 +39,43 @@ void* memset(void* dst, uint8_t value, long bytes) {
 int strlen(const char* cstr) {
 	int length = 0;
 
-	while(cstr[length] != '\0') {
+	while(cstr[length] != 0x00) {
 		length ++;
 	}
 
 	return length;
+}
+
+int wstrlen(const short* wstr) {
+	int length = 0;
+
+	while(wstr[length] != 0x0000) {
+		length ++;
+	}
+
+	return length;
+}
+
+int streq(const char* lcstr, const char* rcstr) {
+
+	int i = 0;
+
+	while (true) {
+
+		char ca = lcstr[i];
+		char cb = rcstr[i];
+
+		if (ca != cb) {
+			return false;
+		}
+
+		if (ca == 0) {
+			break;
+		}
+
+		i ++;
+
+	}
+
+	return true;
 }

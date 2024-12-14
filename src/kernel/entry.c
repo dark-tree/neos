@@ -3,76 +3,68 @@
 #include "console.h"
 #include "floppy.h"
 #include "print.h"
-#include "fat.h"
+#include "interrupt.h"
+#include "util.h"
+#include "cursor.h"
+#include "mem.h"
+#include "scheduler.h"
+#include "vfs.h"
+#include "memory.h"
+#include "procfs.h"
 
 void start() __attribute__((section(".text.start")));
 
-void read_func(unsigned char* data_out, unsigned int offset_in, unsigned int size_in, void* user_args) {
-	floppy_read(data_out, offset_in, size_in);
-}
+extern char asm_test();
+extern void pic_disable();
 
-void write_func(unsigned char* data_in, unsigned int offset_in, unsigned int size_in, void* user_args) {
-	floppy_write(data_in, offset_in, size_in, true);
-}
+extern void* getprocess1();
+extern void* getprocess2();
+
+#define X "\xDB"
+#define S " "
 
 void start() {
+
 	con_init(80, 25);
+	cur_enable();
 
-	kprintf("\033[2J");
+	// Init memory system and make room for the kernel
+	mem_init(0xFFFFF + 1 /* TODO: remove when fix is merged */);
+	pic_disable();
+	int_init();
 
-	if(floppy_init()){
+//	kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m%#0.8x\e[m again!\n", "sweet", 'r', -1920);
 
-		fat_DISK disk;
-		if (fat_init(&disk, read_func, write_func, 0)) {
-			if(fat_remove(&disk.root_directory, "files/mainlongfilename.c", 1)){
-				kprintf("File removed\n");
-			}
-			else{
-				kprintf("Error: Failed to remove file\n");
-			}
+//	kprintf("\e[4B");
+//	kprintf("\e[29C" X S S S X S X X X X S S X X X S S X X X X"\n");
+//	kprintf("\e[29C" X X S S X S S S S S S X S S S X S S S S S"\n");
+//	kprintf("\e[29C" X S X S X S X X S S S X S X S X S X X X X"\n");
+//	kprintf("\e[29C" X S S X X S S S S S S X S S S X S S S S X"\n");
+//	kprintf("\e[29C" X S S S X S X X X X S S X X X S S X X X X"\n");
+//	kprintf("\e[29C" " Linux Compatible OS\n");
 
-			fat_DIR dir;
-			if (fat_create_dir(&dir, &disk.root_directory, "files/test", 0)) {
-				kprintf("Directory created\n");
-			}
-			else{
-				kprintf("Error: Failed to create directory\n");
-			}
+	vfs_init();
 
-			fat_FILE file;
-			if(fat_fopen(&file, &disk.root_directory, "files/test/mainlongfilename8.c", "a")){
-				
-				// Write to the file
-				fat_fwrite("Hello, World!\n", 1, 14, &file);
+	// for now mount /proc at /
+	FilesystemDriver procfs;
+	procfs_load(&procfs);
+	vfs_mount("/", &procfs);
 
-				// Read the file
-				fat_fseek(&file, 0, fat_SEEK_END);
-				unsigned int size = fat_ftell(&file);
-				fat_fseek(&file, 0, fat_SEEK_SET);
+	vfs_print(NULL, 0);
 
-				char buffer[size + 1];
-				fat_fread(buffer, 1, size, &file);
-				buffer[size] = '\0';
+	kprintf("System ready!\n");
 
-				fat_print_buffer(buffer, size);
+	vRef root = vfs_root();
+	//vfs_open(root, "/testing/omg/tmp/test.txt");
+	vRef ref;
 
-			}
-			else{
-				kprintf("Error: Failed to open file\n");
-			}
-		}
-		else{
-			kprintf("Error: Failed to initialize FAT32 disk\n");
-		}
-	}
-	else{
-		kprintf("Error: Floppy not initialized\n");
-	}
+	int res = vfs_open(&ref, &root, "./abcd/../tmp/haha.txt", 0);
+	kprintf("Return: %d\n", res);
 
-	done:
-	kprintf("Done\n");
+	scheduler_init();
+	scheduler_create_process(-1, getprocess1());
+	scheduler_create_process(-1, getprocess2());
 
-	while (true) {
-		__asm("hlt");
-	}
+	// never return to the bootloader
+	halt();
 }
