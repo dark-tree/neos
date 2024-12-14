@@ -12,7 +12,27 @@ spec_impl = [
 	"sys_open",
 	"sys_read",
 	"sys_creat",
-	"sys_lseek"
+	"sys_lseek",
+	"sys_openat",
+	"sys_mkdir",
+	"sys_readlink",
+	"sys_getdents64",
+	"sys_getdents",
+	"sys_old_readdir"
+	"sys_stat",
+	"sys_fstat",
+	"sys_lstat",
+	"sys_newstat",
+	"sys_newlstat",
+	"sys_newfstat",
+	"sys_stat64",
+	"sys_lstat64",
+	"sys_fstat64",
+	"sys_close",
+	"sys_unlink",
+	"sys_unlinkat",
+	"sys_rmdir",
+	"sys_mkdirat"
 ]
 
 # Add all syscalls implemented in ASM at the interrupt level here

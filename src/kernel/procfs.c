@@ -71,7 +71,7 @@ int procfs_readlink(vRef* vref, const char* name, const char* buffer, int size) 
 /* public */
 
 void procfs_load(FilesystemDriver* driver) {
-	memcpy(driver->identifier, "ProcFS", 6);
+	memcpy(driver->identifier, "ProcFS", 7);
 
 	// export driver functions
 	driver->root = procfs_root;

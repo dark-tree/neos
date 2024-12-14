@@ -175,7 +175,11 @@ int scheduler_context_switch(void* old_stack)
 	return (int)general_process_table[process_running].stack;
 }
 
-int scheduler_fput(vRef vref, int pid)
+void scheduler_chdir(int pid, vRef* cwd) {
+	general_process_table[pid].cwd = *cwd;
+}
+
+int scheduler_fput(int pid, vRef vref)
 {
 	if(pid<=0)
 	{

@@ -87,9 +87,7 @@ static void vfs_refcpy(vRef* vref, vRef* src) {
 
 	if (src->driver != NULL) {
 		vref->driver = src->driver;
-		//src->driver->clone(vref, src);
-
-		kprintf(" * VFS %s: clone\n", vref->driver->identifier);
+		src->driver->clone(vref, src);
 	}
 }
 
@@ -297,6 +295,15 @@ int vfs_remove(vRef* vref, bool rmdir) {
 int vfs_stat(vRef* vref, vStat* stat) {
 	if (vref->driver) {
 		return vref->driver->stat(vref, stat);
+	}
+
+	// TODO No driver at leaf node, return error?
+	return 0;
+}
+
+int vfs_readlink(vRef* vref, const char* name, const char* buffer, int size) {
+	if (vref->driver) {
+		return vref->driver->readlink(vref, name, buffer, size);
 	}
 
 	// TODO No driver at leaf node, return error?

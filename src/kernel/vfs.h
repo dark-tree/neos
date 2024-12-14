@@ -24,6 +24,21 @@
 #define OPEN_NOFOLLOW  0x000100 /* Don't follow links in path */
 #define OPEN_TRUNC     0x000200 /* Clear (truncate) the file */
 
+/*
+ * Describes the type of the file
+ */
+typedef enum {
+	DT_UNKNOWN = 0,
+	DT_FIFO    = 1,  /* Named pipe (FIFO) */
+	DT_CHR     = 2,  /* Character device */
+	DT_DIR     = 4,  /* Directory */
+	DT_BLK     = 6,  /* Block device. */
+	DT_REG     = 8,  /* Regular file */
+	DT_LNK     = 10, /* Symbolic link */
+	DT_SOCK    = 12, /* UNIX domain socket */
+	DT_WHT     = 14, /* unused and ignored, something from BSD idk */
+} vEntryType;
+
 /**
  * @brief This is analoguse to the `struct old_linux_dirent`
  * @note See readdir(2) man page for more info
@@ -38,6 +53,9 @@ typedef struct {
 
 	// name of the file or directory, null terminated
 	char name[FILE_MAX_NAME];
+
+	// the type of this directory entry or DT_UNKNOWN if the driver dosn't feel like telling
+	vEntryType type;
 
 } vEntry;
 
@@ -75,11 +93,14 @@ typedef struct {
 	// last modefication time, as linux timestamp
 	uint32_t mtime;
 
-	// number of blocks used to stroe the file
+	// number of blocks used to store the file
 	uint32_t blocks;
 
 	// can this file be written to
 	bool writtable;
+
+	// type of the file, this must not be DT_UNKNOWN
+	vEntryType type;
 
 } vStat;
 
@@ -173,7 +194,7 @@ typedef int (*driver_read) (vRef* vref, void* buffer, uint32_t size);
  *
  * @return the number of bytes written on success and a negated ERRNO code on error
  *         LINUX_EIO     - Internal IO error occured in the filesystem itself
- *         LINUX_EINVAL  - Can't write to the give vRef
+ *         LINUX_EINVAL  - Can't write to the given vRef
  *         LINUX_EISDIR  - vRef is a directory
  */
 typedef int (*driver_write) (vRef* vref, void* buffer, uint32_t size);
@@ -296,49 +317,54 @@ int vfs_resolve(vPath* path, char* buffer);
 void vfs_init();
 
 /**
- *
+ * @brief Perform a filesystem-independent file open() operation
  */
 int vfs_open(vRef* vref, vRef* relation, const char* path, uint32_t flags);
 
 /**
- *
+ * @brief Perform a filesystem-independent file close() operation
  */
 int vfs_close(vRef* vref);
 
 /**
- *
+ * @brief Perform a filesystem-independent file read() operation
  */
 int vfs_read(vRef* vref, void* buffer, uint32_t size);
 
 /**
- *
+ * @brief Perform a filesystem-independent file write() operation
  */
 int vfs_write(vRef* vref, void* buffer, uint32_t size);
 
 /**
- *
+ * @brief Perform a filesystem-independent file seek() operation
  */
 int vfs_seek(vRef* vref, int offset, int whence);
 
 /**
- *
+ * @brief Perform a filesystem-independent file readdir() operation
  */
 int vfs_list(vRef* vref, vEntry* entries, int max);
 
 /**
- *
+ * @brief Perform a filesystem-independent file mkdir() operation
  */
 int vfs_mkdir(vRef* vref, const char* name);
 
 /**
- *
+ * @brief Perform a filesystem-independent file unlink()/rmdir() operation
  */
 int vfs_remove(vRef* vref, bool rmdir);
 
 /**
- *
+ * @brief Perform a filesystem-independent file stat() operation
  */
 int vfs_stat(vRef* vref, vStat* stat);
+
+/**
+ * @brief Perform a filesystem-independent file readlink() operation
+ */
+int vfs_readlink(vRef* vref, const char* name, const char* buffer, int size);
 
 /**
  * @brief Get a reference to the root of the VFS, this can be then used to oepn paths
