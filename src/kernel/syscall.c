@@ -4,6 +4,7 @@
 #include "util.h"
 #include "errno.h"
 #include "scheduler.h"
+#include "memory.h"
 
 /* private */
 
@@ -298,6 +299,7 @@ static int stat(const char* filename, void* statbuf, void (*converter) (void* ds
 	}
 
 	if (res = vfs_stat(&vref, &stat)) {
+		vfs_close(&vref);
 		return res;
 	}
 
@@ -621,6 +623,100 @@ static int sys_lstat64(const char* filename, struct stat64* statbuf) {
 
 static int sys_fstat64(unsigned long fd, struct stat64* statbuf) {
 	return fstat(fd, statbuf, vstat_to_linux_64);
+}
+
+static int sys_close(unsigned int fd) {
+
+	if (fd <= 0) {
+		return -LINUX_EBADF;
+	}
+
+	int caller = scheduler_get_current_pid();
+	vRef* vref = scheduler_fget(caller, fd);
+
+	if (!vref) {
+		return -LINUX_EBADF;
+	}
+
+	vfs_close(vref);
+
+	if (scheduler_fremove(caller, fd)) {
+		return -LINUX_EBADF;
+	}
+
+	return 0;
+}
+
+static int sys_unlinkat(int fd, const char* pathname, int flag) {
+
+	vRef* parent = fd_resolve(fd);
+	if (!parent) {
+		return -LINUX_EBADF;
+	}
+
+	vRef vref;
+	int res = 0;
+
+	if (res = vfs_open(&vref, parent, pathname, OPEN_NOFOLLOW | (flag ? OPEN_DIRECTORY : 0))) {
+		return res;
+	}
+
+	if (res = vfs_remove(&vref, flag ? true : false)) {
+		vfs_close(&vref);
+		return res;
+	}
+
+	if (res = vfs_close(&vref)) {
+		return res;
+	}
+
+	return 0;
+
+}
+
+static int sys_unlink(const char* pathname) {
+
+	vRef cwd = fd_cwd();
+	vRef vref;
+	int res = 0;
+
+	if (res = vfs_open(&vref, &cwd, pathname, OPEN_NOFOLLOW)) {
+		return res;
+	}
+
+	if (res = vfs_remove(&vref, false)) {
+		vfs_close(&vref);
+		return res;
+	}
+
+	if (res = vfs_close(&vref)) {
+		return res;
+	}
+
+	return 0;
+
+}
+
+static int sys_rmdir(const char* pathname) {
+
+	vRef cwd = fd_cwd();
+	vRef vref;
+	int res = 0;
+
+	if (res = vfs_open(&vref, &cwd, pathname, OPEN_DIRECTORY | OPEN_NOFOLLOW)) {
+		return res;
+	}
+
+	if (res = vfs_remove(&vref, true)) {
+		vfs_close(&vref);
+		return res;
+	}
+
+	if (res = vfs_close(&vref)) {
+		return res;
+	}
+
+	return 0;
 }
 
 #define SYSCALL_ENTRY(args, function) {.adapter = syscall_adapter_fn##args, .handler = (void*) (function)}

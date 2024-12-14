@@ -317,37 +317,37 @@ int vfs_resolve(vPath* path, char* buffer);
 void vfs_init();
 
 /**
- * @brief Perform a filesystem-independent open() operation
+ * @brief Perform a filesystem-independent file open() operation
  */
 int vfs_open(vRef* vref, vRef* relation, const char* path, uint32_t flags);
 
 /**
- *
+ * @brief Perform a filesystem-independent file close() operation
  */
 int vfs_close(vRef* vref);
 
 /**
- * @brief Perform a filesystem-independent read() operation
+ * @brief Perform a filesystem-independent file read() operation
  */
 int vfs_read(vRef* vref, void* buffer, uint32_t size);
 
 /**
- * @brief Perform a filesystem-independent write() operation
+ * @brief Perform a filesystem-independent file write() operation
  */
 int vfs_write(vRef* vref, void* buffer, uint32_t size);
 
 /**
- * @brief Perform a filesystem-independent seek() operation
+ * @brief Perform a filesystem-independent file seek() operation
  */
 int vfs_seek(vRef* vref, int offset, int whence);
 
 /**
- * @brief Perform a filesystem-independent readdir() operation
+ * @brief Perform a filesystem-independent file readdir() operation
  */
 int vfs_list(vRef* vref, vEntry* entries, int max);
 
 /**
- * @brief Perform a filesystem-independent mkdir() operation
+ * @brief Perform a filesystem-independent file mkdir() operation
  */
 int vfs_mkdir(vRef* vref, const char* name);
 
@@ -357,12 +357,12 @@ int vfs_mkdir(vRef* vref, const char* name);
 int vfs_remove(vRef* vref, bool rmdir);
 
 /**
- * @brief Perform a filesystem-independent stat() operation
+ * @brief Perform a filesystem-independent file stat() operation
  */
 int vfs_stat(vRef* vref, vStat* stat);
 
 /**
- * @brief Perform a filesystem-independent readlink() operation
+ * @brief Perform a filesystem-independent file readlink() operation
  */
 int vfs_readlink(vRef* vref, const char* name, const char* buffer, int size);
 
