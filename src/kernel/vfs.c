@@ -255,6 +255,10 @@ int vfs_write(vRef* vref, void* buffer, uint32_t size) {
 }
 
 int vfs_seek(vRef* vref, int offset, int whence) {
+	if (whence != SEEK_CUR && whence != SEEK_END && whence != SEEK_SET) {
+		return -LINUX_EINVAL;
+	}
+
 	if (vref->driver) {
 		return vref->driver->seek(vref, offset, whence);
 	}

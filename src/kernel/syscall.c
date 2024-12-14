@@ -76,18 +76,26 @@ static int syscall_adapter_fn5(struct SyscallEntry_tag* entry, int ebx, int ecx,
 	return -1;
 }
 
+/* syscall ustils */
+
+static vRef* fd_resolve(int fd) {
+
+	if (fd <= 0) {
+		return NULL;
+	}
+
+	int caller = scheduler_get_current_pid();
+	return scheduler_fget(caller, fd);
+
+}
+
 /* input/output */
 
 static int sys_write(int fd, char* buffer, int bytes) {
 
-	if (fd <= 0) {
-		return -LINUX_EBADF;
-	}
+	vRef* vref = fd_resolve(fd);
 
-	int caller = scheduler_get_current_pid();
-	vRef* vref = scheduler_fget(caller, fd);
-
-	if (vref == NULL) {
+	if (!vref) {
 		return -LINUX_EBADF;
 	}
 
@@ -96,14 +104,9 @@ static int sys_write(int fd, char* buffer, int bytes) {
 
 static int sys_read(int fd, char* buffer, int bytes) {
 
-	if (fd <= 0) {
-		return -LINUX_EBADF;
-	}
+	vRef* vref = fd_resolve(fd);
 
-	int caller = scheduler_get_current_pid();
-	vRef* vref = scheduler_fget(caller, fd);
-
-	if (vref == NULL) {
+	if (!vref) {
 		return -LINUX_EBADF;
 	}
 
@@ -136,6 +139,21 @@ static int sys_open(const char* filename, int flags, int mode) {
 	}
 
 	return fd;
+}
+
+static int sys_creat(const char* pathname, int mode) {
+	return sys_open(pathname, OPEN_WRONLY | OPEN_CREAT | OPEN_WRONLY, mode);
+}
+
+static int sys_lseek(unsigned int fd, int offset, unsigned int whence) {
+
+	vRef* vref = fd_resolve(fd);
+
+	if (!vref) {
+		return -LINUX_EBADF;
+	}
+
+	return vfs_seek(vref, offset, whence);
 }
 
 #define SYSCALL_ENTRY(args, function) {.adapter = syscall_adapter_fn##args, .handler = (void*) (function)}
