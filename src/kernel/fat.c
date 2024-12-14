@@ -5,6 +5,8 @@
     #define NULL 0
 #endif
 
+#define fat_DEBUG
+
 /* private helper functions */
 
 static char to_lowercase(char c) {
@@ -158,7 +160,7 @@ static void fat_write_fat_entry(fat_DISK* disk, unsigned int cluster, unsigned i
 	disk->write_func((unsigned char*)&value, fat_entry + fat_size, sizeof(value), disk->user_args);
 }
 
-void fat_fread(void* data_out, unsigned int element_size, unsigned int element_count, fat_FILE* file) {
+unsigned char fat_fread(void* data_out, unsigned int element_size, unsigned int element_count, fat_FILE* file) {
 	/*
 	* In order to read the contents of a file, first we need to read the DIR_FstClusLO value from the directory entry.
 	* This value is the first cluster of the file where the data is stored.
@@ -240,6 +242,8 @@ void fat_fread(void* data_out, unsigned int element_size, unsigned int element_c
 	}
 
 	file->cursor += read_total_bytes;
+
+	return 1;
 }
 
 unsigned int fat_file_cluster_count(fat_FILE* file) {
@@ -796,54 +800,62 @@ void fat_update_lfn(fat_FILE* file, unsigned char remove) {
 	}
 }
 
+unsigned char fat_fremove(fat_FILE* file) {
+	fat_update_lfn(file, 1);
+
+	// Set the entry in the directory as free
+	file->fat_dir.DIR_Name[0] = 0xE5;
+	fat_update_entry(file);
+
+	fat_remove_fat_chain(file);
+
+	return 1;
+}
+
+unsigned char fat_dirremove(fat_DIR* dir) {
+	fat_DIR helper_dir;
+	fat_FILE helper_file;
+	
+	fat_rewinddir(dir);
+
+	while (1) {
+		int dir_entry = fat_readdir(&helper_dir, &helper_file, dir);
+
+		if (dir_entry == fat_NOT_FOUND) {
+			break;
+		}
+
+		fat_FILE* file_ptr = dir_entry == fat_FOUND_FILE ? &helper_file : &helper_dir.dir_file;
+
+		if (file_ptr->fat_dir.DIR_Name[0] == '.' || (file_ptr->fat_dir.DIR_Name[0] == '.' && file_ptr->fat_dir.DIR_Name[1] == '.')) {
+			continue;
+		}
+
+		char new_path[sizeof(file_ptr->long_filename) / 2];
+		fat_longname_to_string(file_ptr->long_filename, new_path);
+		fat_remove(dir, new_path, (file_ptr->fat_dir.DIR_Attr & fat_ATTR_DIRECTORY) == 0);
+	}
+
+	// Set the entry in the directory as free
+	dir->dir_file.fat_dir.DIR_Name[0] = 0xE5;
+	fat_update_entry(&dir->dir_file);
+
+	fat_remove_fat_chain(&dir->dir_file);
+
+	return 1;
+}
+
 unsigned char fat_remove(fat_DIR* root_dir, const char* path, unsigned char is_file) {
 	fat_DIR found_dir;
 	fat_FILE found_file;
 	int find_success = fat_find(&found_dir, &found_file, root_dir, path, is_file, 0);
 
 	if (find_success == fat_FOUND_FILE) {
-		fat_update_lfn(&found_file, 1);
-
-		// Set the entry in the directory as free
-		found_file.fat_dir.DIR_Name[0] = 0xE5;
-		fat_update_entry(&found_file);
-
-		fat_remove_fat_chain(&found_file);
-
-		return 1;
+		return fat_fremove(&found_file);
 	}
 
 	if (find_success == fat_FOUND_DIR) {
-		fat_DIR helper_dir;
-		fat_FILE helper_file;
-		
-		fat_rewinddir(&found_dir);
-
-		while (1) {
-			int dir_entry = fat_readdir(&helper_dir, &helper_file, &found_dir);
-
-			if (dir_entry == fat_NOT_FOUND) {
-				break;
-			}
-
-			fat_FILE* file_ptr = dir_entry == fat_FOUND_FILE ? &helper_file : &helper_dir.dir_file;
-
-			if (file_ptr->fat_dir.DIR_Name[0] == '.' || (file_ptr->fat_dir.DIR_Name[0] == '.' && file_ptr->fat_dir.DIR_Name[1] == '.')) {
-				continue;
-			}
-
-			char new_path[sizeof(file_ptr->long_filename) / 2];
-			fat_longname_to_string(file_ptr->long_filename, new_path);
-			fat_remove(&found_dir, new_path, (file_ptr->fat_dir.DIR_Attr & fat_ATTR_DIRECTORY) == 0);
-		}
-
-		// Set the entry in the directory as free
-		found_dir.dir_file.fat_dir.DIR_Name[0] = 0xE5;
-		fat_update_entry(&found_dir.dir_file);
-
-		fat_remove_fat_chain(&found_dir.dir_file);
-
-		return 1;
+		return fat_dirremove(&found_dir);
 	}
 
 	return 0;

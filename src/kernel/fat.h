@@ -133,9 +133,9 @@ typedef struct fat_DISK_s {
  * @param element_count number of objects to read
  * @param file file to read from
  *  
- * @return None
+ * @return 1 if the read was successful, 0 if the read was not successful
 */
-void fat_fread(void* data_out, unsigned int element_size, unsigned int element_count, fat_FILE* file);
+unsigned char fat_fread(void* data_out, unsigned int element_size, unsigned int element_count, fat_FILE* file);
 
 /**
  * @brief Write the data to the file
@@ -210,6 +210,24 @@ int fat_readdir(fat_DIR* dir_out, fat_FILE* file_out, fat_DIR* parent_dir);
  * @return 1 if the directory was opened, 0 if the directory was not found
 */
 int fat_opendir(fat_DIR* subdir_out, fat_DIR* root_dir, const char* path);
+
+/**
+ * @brief Remove the file at the given path
+ * 
+ * @param file file to remove
+ * 
+ * @return 1 if the file was removed, 0 if the file was not removed
+*/
+unsigned char fat_fremove(fat_FILE* file);
+
+/**
+ * @brief Remove the directory at the given path
+ * 
+ * @param dir directory to remove
+ * 
+ * @return 1 if the directory was removed, 0 if the directory was not removed
+*/
+unsigned char fat_dirremove(fat_DIR* dir);
 
 /**
  * @brief Remove the file at the given path

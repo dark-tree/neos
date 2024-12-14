@@ -11,6 +11,8 @@
 #include "vfs.h"
 #include "memory.h"
 #include "procfs.h"
+#include "fatfs.h"
+#include "routine.h"
 
 void start() __attribute__((section(".text.start")));
 
@@ -33,6 +35,8 @@ void start() {
 	pic_disable();
 	int_init();
 
+	isr_register(0x26, NULL);
+
 //	kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m%#0.8x\e[m again!\n", "sweet", 'r', -1920);
 
 //	kprintf("\e[4B");
@@ -47,7 +51,8 @@ void start() {
 
 	// for now mount /proc at /
 	FilesystemDriver procfs;
-	procfs_load(&procfs);
+	//procfs_load(&procfs);
+	fatfs_load(&procfs);
 	vfs_mount("/", &procfs);
 
 	vfs_print(NULL, 0);
@@ -60,6 +65,13 @@ void start() {
 
 	int res = vfs_open(&ref, &root, "./abcd/../tmp/haha.txt", 0);
 	kprintf("Return: %d\n", res);
+
+	vfs_open(&ref, &root, "./abc/foo/test.txt", OPEN_CREAT);
+	res = vfs_write(&ref, "Hello, World!\n", 14);
+	kprintf("Return: %d\n", res);
+	res = vfs_write(&ref, "Hello, World!\n", 14);
+	kprintf("Return: %d\n", res);
+	//halt();
 
 	scheduler_init();
 	scheduler_create_process(-1, getprocess1());

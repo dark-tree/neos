@@ -30,7 +30,8 @@ KERNEL_CC = \
 	build/kernel/mem.o \
 	build/kernel/rivendell.o \
 	build/kernel/vfs.o \
-	build/kernel/procfs.o
+	build/kernel/procfs.o \
+	build/kernel/fatfs.o
 
 # Configuration
 CC_FLAGS = -nostdinc -fomit-frame-pointer -fno-builtin -nodefaultlibs -nostdlib -ffreestanding -g
