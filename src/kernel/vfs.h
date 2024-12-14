@@ -24,6 +24,21 @@
 #define OPEN_NOFOLLOW  0x000100 /* Don't follow links in path */
 #define OPEN_TRUNC     0x000200 /* Clear (truncate) the file */
 
+/*
+ * Describes the type of the file
+ */
+typedef enum {
+	DT_UNKNOWN = 0,
+	DT_FIFO    = 1,  /* Named pipe (FIFO) */
+	DT_CHR     = 2,  /* Character device */
+	DT_DIR     = 4,  /* Directory */
+	DT_BLK     = 6,  /* Block device. */
+	DT_REG     = 8,  /* Regular file */
+	DT_LNK     = 10, /* Symbolic link */
+	DT_SOCK    = 12, /* UNIX domain socket */
+	DT_WHT     = 14, /* unused and ignored, something from BSD idk */
+} vEntryType;
+
 /**
  * @brief This is analoguse to the `struct old_linux_dirent`
  * @note See readdir(2) man page for more info
@@ -38,6 +53,9 @@ typedef struct {
 
 	// name of the file or directory, null terminated
 	char name[FILE_MAX_NAME];
+
+	// the type of this directory entry or DT_UNKNOWN if the dirver dosn't feel like telling
+	vEntryType type;
 
 } vEntry;
 
@@ -296,7 +314,7 @@ int vfs_resolve(vPath* path, char* buffer);
 void vfs_init();
 
 /**
- *
+ * @brief Perform a filesystem-independent open() operation
  */
 int vfs_open(vRef* vref, vRef* relation, const char* path, uint32_t flags);
 
@@ -306,27 +324,27 @@ int vfs_open(vRef* vref, vRef* relation, const char* path, uint32_t flags);
 int vfs_close(vRef* vref);
 
 /**
- *
+ * @brief Perform a filesystem-independent read() operation
  */
 int vfs_read(vRef* vref, void* buffer, uint32_t size);
 
 /**
- *
+ * @brief Perform a filesystem-independent write() operation
  */
 int vfs_write(vRef* vref, void* buffer, uint32_t size);
 
 /**
- *
+ * @brief Perform a filesystem-independent seek() operation
  */
 int vfs_seek(vRef* vref, int offset, int whence);
 
 /**
- *
+ * @brief Perform a filesystem-independent readdir() operation
  */
 int vfs_list(vRef* vref, vEntry* entries, int max);
 
 /**
- *
+ * @brief Perform a filesystem-independent mkdir() operation
  */
 int vfs_mkdir(vRef* vref, const char* name);
 
@@ -341,7 +359,7 @@ int vfs_remove(vRef* vref, bool rmdir);
 int vfs_stat(vRef* vref, vStat* stat);
 
 /**
- *
+ * @brief Perform a filesystem-independent readlink() operation
  */
 int vfs_readlink(vRef* vref, const char* name, const char* buffer, int size);
 
