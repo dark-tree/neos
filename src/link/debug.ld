@@ -5,7 +5,9 @@ SECTIONS {
 
 	/* First output all the functions */
 	.text : SUBALIGN(0) {
+		*(.text.start)
 		*(.text)
+		*(.text.unlikely)
 	}
 
 	/* And then all the data */

@@ -21,4 +21,3 @@ clean:
 run: build
 	@echo "Running..."
 	viewer/build/main
-
