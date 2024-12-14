@@ -341,6 +341,11 @@ int vfs_remove(vRef* vref, bool rmdir);
 int vfs_stat(vRef* vref, vStat* stat);
 
 /**
+ *
+ */
+int vfs_readlink(vRef* vref, const char* name, const char* buffer, int size);
+
+/**
  * @brief Get a reference to the root of the VFS, this can be then used to oepn paths
  * @return Root VFS
  */

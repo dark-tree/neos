@@ -303,6 +303,15 @@ int vfs_stat(vRef* vref, vStat* stat) {
 	return 0;
 }
 
+int vfs_readlink(vRef* vref, const char* name, const char* buffer, int size) {
+	if (vref->driver) {
+		return vref->driver->readlink(vref, name, buffer, size);
+	}
+
+	// TODO No driver at leaf node, return error?
+	return 0;
+}
+
 int vfs_resolve(vPath* path, char* buffer) {
 
 	// index into the filename buffer

@@ -89,6 +89,38 @@ static vRef* fd_resolve(int fd) {
 
 }
 
+static vRef fd_cwd() {
+
+	ProcessDescriptor process;
+
+	// load calling process
+	int caller = scheduler_get_current_pid();
+	scheduler_load_process_info(&process, caller);
+
+	return process.cwd;
+
+}
+
+static int fd_open(vRef* parent, const char* filename, int flags) {
+
+	vRef new_file;
+	int res = vfs_open(&new_file, parent, filename, flags);
+
+	if (res < 0) {
+		return res;
+	}
+
+	int caller = scheduler_get_current_pid();
+	int fd = scheduler_fput(new_file, caller);
+
+	// scheduler_fput uses 0 as error code...
+	if (fd == 0) {
+		return -LINUX_EMFILE;
+	}
+
+	return fd;
+}
+
 /* input/output */
 
 static int sys_write(int fd, char* buffer, int bytes) {
@@ -115,30 +147,27 @@ static int sys_read(int fd, char* buffer, int bytes) {
 
 static int sys_open(const char* filename, int flags, int mode) {
 
-	ProcessDescriptor process;
-
-	// load calling process
-	int caller = scheduler_get_current_pid();
-	scheduler_load_process_info(&process, caller);
+	vRef cwd = fd_cwd();
 
 	// mode is ignored by our glorious NEOS kernel, who needs permissions anyway?
 	(void) mode;
 
-	vRef new_file;
-	int res = vfs_open(&new_file, &process.cwd, filename, flags);
+	return fd_open(&cwd, filename, flags);
+}
 
-	if (res < 0) {
-		return res;
+static int sys_openat(int fd, const char* filename, int flags, int mode) {
+
+	vRef* vref = fd_resolve(fd);
+
+	if (!vref) {
+		return -LINUX_EBADF;
 	}
 
-	int fd = scheduler_fput(new_file, caller);
+	// mode is ignored by our glorious NEOS kernel, who needs permissions anyway?
+	(void) mode;
 
-	// scheduler_fput uses 0 as error code...
-	if (fd == 0) {
-		return -LINUX_EMFILE;
-	}
+	return fd_open(vref, filename, flags);
 
-	return fd;
 }
 
 static int sys_creat(const char* pathname, int mode) {
@@ -154,6 +183,21 @@ static int sys_lseek(unsigned int fd, int offset, unsigned int whence) {
 	}
 
 	return vfs_seek(vref, offset, whence);
+}
+
+static int sys_mkdir(const char* pathname, int mode) {
+
+	vRef cwd = fd_cwd();
+	(void) mode;
+
+	return vfs_mkdir(&cwd, pathname);
+}
+
+static int sys_readlink(const char* path, char* buf, int size) {
+
+	vRef cwd = fd_cwd();
+
+	return vfs_readlink(&cwd, path, buf, size);
 }
 
 #define SYSCALL_ENTRY(args, function) {.adapter = syscall_adapter_fn##args, .handler = (void*) (function)}
