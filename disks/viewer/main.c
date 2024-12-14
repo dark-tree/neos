@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <dirent.h>
+#include <unistd.h>
+#include <sys/stat.h>
 
 #include "fat.h"
 
@@ -215,6 +218,70 @@ void interactive_file_explorer(fat_DISK* disk) {
 	}
 }
 
+#define LOAD_SRC_DIR "files"
+
+// load files and directories from the source directory to fat disk recursively
+int load_files(fat_DIR* root_dir, const char* source_dir) {
+	int files_loaded = 0;
+
+	DIR* dir = opendir(source_dir);
+	if (dir == NULL) {
+		printf("Error: Could not open directory %s\n", source_dir);
+		return 0;
+	}
+
+	struct dirent* entry;
+	while ((entry = readdir(dir)) != NULL) {
+		if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+			continue;
+		}
+		
+		char fullpath[1024];
+		snprintf(fullpath, sizeof(fullpath), "%s/%s", source_dir, entry->d_name);
+
+		struct stat statbuf;
+		if (stat(fullpath, &statbuf) == -1) {
+			printf("Error: Could not stat file %s\n", fullpath);
+			continue;
+		}
+
+		if (S_ISDIR(statbuf.st_mode)) {
+			fat_DIR new_dir;
+			if (fat_create_dir(&new_dir, root_dir, entry->d_name, 0)) {
+				files_loaded += load_files(&new_dir, fullpath);
+			}
+		}
+		else if (S_ISREG(statbuf.st_mode)) {
+			fat_FILE new_file;
+			if (fat_create_file(&new_file, root_dir, entry->d_name, 0)) {
+				FILE* file = fopen(fullpath, "rb");
+				if (file == NULL) {
+					printf("Error: Could not open file %s\n", fullpath);
+					continue;
+				}
+
+				int file_size = statbuf.st_size;
+				unsigned char* buffer = (unsigned char*)malloc(file_size);
+
+				fread(buffer, 1, file_size, file);
+				if (fat_fwrite(buffer, 1, file_size, &new_file)) {
+					files_loaded++;
+				}
+				else {
+					printf("Error: Could not write file %s\n", fullpath);
+				}
+
+				free(buffer);
+				fclose(file);
+			}
+		}
+	}
+
+	closedir(dir);
+
+	return files_loaded;
+}
+
 void disk_read_func(unsigned char* data_out, unsigned int offset_in, unsigned int size_in, void* user_args) {
 	FILE* file = (FILE*)user_args;
 	fseek(file, offset_in, SEEK_SET);
@@ -227,7 +294,7 @@ void disk_write_func(unsigned char* data_in, unsigned int offset_in, unsigned in
 	fwrite(data_in, 1, size_in, file);
 }
 
-int main() {
+int main(int argc, char** argv) {
 	const char* image_file = "floppy.img";
 
 	// open the image file
@@ -241,6 +308,17 @@ int main() {
 	fat_DISK disk;
 	if(!fat_init(&disk, disk_read_func, disk_write_func, file)) {
 		return 1;
+	}
+
+	for (int i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "-l") == 0) {
+			printf("Loading files from %s\n", LOAD_SRC_DIR);
+			int loaded = load_files(&disk.root_directory, LOAD_SRC_DIR);
+			printf("Loaded %d files\n", loaded);
+
+			fclose(file);
+			return 0;
+		}
 	}
 
 	interactive_file_explorer(&disk);

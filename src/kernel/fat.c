@@ -435,7 +435,7 @@ unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int 
 	return 1;
 }
 
-void fat_fseek(fat_FILE* file, int offset, int origin) {
+int fat_fseek(fat_FILE* file, int offset, int origin) {
 	if (origin == fat_SEEK_SET) {
 		file->cursor = offset;
 	}
@@ -445,6 +445,22 @@ void fat_fseek(fat_FILE* file, int offset, int origin) {
 	else if (origin == fat_SEEK_END) {
 		file->cursor = file->fat_dir.DIR_FileSize + offset;
 	}
+
+	return 1;
+}
+
+int fat_dirseek(fat_DIR* dir, int offset, int origin) {
+	if (origin == fat_SEEK_SET) {
+		dir->dir_file.cursor = offset;
+	}
+	else if (origin == fat_SEEK_CUR) {
+		dir->dir_file.cursor += offset;
+	}
+	else if (origin == fat_SEEK_END) {
+		return 0;
+	}
+
+	return 1;
 }
 
 int fat_ftell(fat_FILE* file) {

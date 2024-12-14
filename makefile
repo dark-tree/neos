@@ -104,7 +104,7 @@ all: build/final.iso image
 # Remove all build elements
 clean:
 	rm -rf ./build
-	rm -f ./disks/floppy.img
+	$(MAKE) makefile -C ./disks clean
 
 # Invoke QEMU wihtout waiting for GDB
 run: build/final.iso disks/floppy.img

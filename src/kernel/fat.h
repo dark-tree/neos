@@ -145,7 +145,7 @@ void fat_fread(void* data_out, unsigned int element_size, unsigned int element_c
  * @param element_count number of objects to write
  * @param file file to write to
  * 
- * @return None
+ * @return 1 if the write was successful, 0 if the write was not successful
 */
 unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int element_count, fat_FILE* file);
 
@@ -156,9 +156,9 @@ unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int 
  * @param offset the number of bytes to move the cursor
  * @param origin the position from which the offset is added (fat_SEEK_SET, fat_SEEK_CUR, fat_SEEK_END)
  * 
- * @return None
+ * @return 1 if the seek was successful, 0 if the seek was not successful
 */
-void fat_fseek(fat_FILE* file, int offset, int origin);
+int fat_fseek(fat_FILE* file, int offset, int origin);
 
 /**
  * @brief Get the current position of the cursor in the file
@@ -177,6 +177,17 @@ int fat_ftell(fat_FILE* file);
  * @return None
 */
 void fat_rewinddir(fat_DIR* dir);
+
+/**
+ * @brief Seek to the given offset in the directory
+ * 
+ * @param dir directory to seek in
+ * @param offset the number of bytes to seek
+ * @param origin the position from which the offset is added (fat_SEEK_SET, fat_SEEK_CUR, fat_SEEK_END)
+ * 
+ * @return 1 if the seek was successful, 0 if the seek was not successful
+*/
+int fat_dirseek(fat_DIR* dir, int offset, int origin);
 
 /**
  * @brief Read the directory entry at the cursor position, entry can be a file or a directory. Useful for iterating over the directory.
