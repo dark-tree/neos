@@ -54,7 +54,7 @@ typedef struct {
 	// name of the file or directory, null terminated
 	char name[FILE_MAX_NAME];
 
-	// the type of this directory entry or DT_UNKNOWN if the dirver dosn't feel like telling
+	// the type of this directory entry or DT_UNKNOWN if the driver dosn't feel like telling
 	vEntryType type;
 
 } vEntry;
@@ -93,11 +93,14 @@ typedef struct {
 	// last modefication time, as linux timestamp
 	uint32_t mtime;
 
-	// number of blocks used to stroe the file
+	// number of blocks used to store the file
 	uint32_t blocks;
 
 	// can this file be written to
 	bool writtable;
+
+	// type of the file, this must not be DT_UNKNOWN
+	vEntryType type;
 
 } vStat;
 
@@ -191,7 +194,7 @@ typedef int (*driver_read) (vRef* vref, void* buffer, uint32_t size);
  *
  * @return the number of bytes written on success and a negated ERRNO code on error
  *         LINUX_EIO     - Internal IO error occured in the filesystem itself
- *         LINUX_EINVAL  - Can't write to the give vRef
+ *         LINUX_EINVAL  - Can't write to the given vRef
  *         LINUX_EISDIR  - vRef is a directory
  */
 typedef int (*driver_write) (vRef* vref, void* buffer, uint32_t size);
@@ -354,7 +357,7 @@ int vfs_mkdir(vRef* vref, const char* name);
 int vfs_remove(vRef* vref, bool rmdir);
 
 /**
- *
+ * @brief Perform a filesystem-independent stat() operation
  */
 int vfs_stat(vRef* vref, vStat* stat);
 

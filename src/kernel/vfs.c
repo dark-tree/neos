@@ -87,9 +87,7 @@ static void vfs_refcpy(vRef* vref, vRef* src) {
 
 	if (src->driver != NULL) {
 		vref->driver = src->driver;
-		//src->driver->clone(vref, src);
-
-		kprintf(" * VFS %s: clone\n", vref->driver->identifier);
+		src->driver->clone(vref, src);
 	}
 }
 

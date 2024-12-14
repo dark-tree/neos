@@ -122,32 +122,211 @@ static int fd_open(vRef* parent, const char* filename, int flags) {
 }
 
 struct old_linux_dirent {
-	unsigned long d_ino;      /* inode number */
-	unsigned long d_offset;   /* offset to this old_linux_dirent */
-	unsigned short d_namlen;  /* length of this d_name */
-	char  d_name[];           /* filename (null-terminated) */
+	unsigned long      d_ino;         /* inode number */
+	unsigned long      d_offset;      /* offset to this old_linux_dirent */
+	unsigned short     d_namlen;      /* length of this d_name */
+	char               d_name[];      /* filename (null-terminated) */
 };
 
 struct linux_dirent {
-	unsigned long  d_ino;     /* Inode number */
-	unsigned long  d_off;     /* Not an offset; see below */
-	unsigned short d_reclen;  /* Length of this linux_dirent */
-	char           d_name[];  /* Filename (null-terminated) */
-                              /* length is actually (d_reclen - 2 -
-                                 offsetof(struct linux_dirent, d_name)) */
-    /*
-	char           pad;       // Zero padding byte
-	char           d_type;    // File type (only since Linux 2.6.4); offset is (d_reclen - 1)
-	*/
+	unsigned long      d_ino;         /* Inode number */
+	unsigned long      d_off;         /* Not an offset; see below */
+	unsigned short     d_reclen;      /* Length of this linux_dirent */
+	char               d_name[];      /* Filename (null-terminated) */
+                                      /* length is actually (d_reclen - 2 -
+                                         offsetof(struct linux_dirent, d_name)) */
+
+    /* those fields DO exist here but are non-explicit */
+	/*char             pad;*/         /* Zero padding byte */
+	/*char             d_type;*/      /* File type (only since Linux 2.6.4); offset is (d_reclen - 1) */
 };
 
 struct linux_dirent64 {
-	uint64_t       d_ino;     /* 64-bit inode number */
-	uint64_t       d_off;     /* Not an offset; see getdents() */
-	unsigned short d_reclen;  /* Size of this dirent */
-	unsigned char  d_type;    /* File type */
-	char           d_name[];  /* Filename (null-terminated) */
+	uint64_t           d_ino;         /* 64-bit inode number */
+	uint64_t           d_off;         /* Not an offset; see getdents() */
+	unsigned short     d_reclen;      /* Size of this dirent */
+	unsigned char      d_type;        /* File type */
+	char               d_name[];      /* Filename (null-terminated) */
 };
+
+unsigned short mkmode(vEntryType type, int owner, int group, int other, bool suid, bool sgid) {
+	return (type << 4) | owner | (group << 3) | (other << 6) | (suid ? 0x0800 : 0) | (sgid ? 0x0400 : 0);
+}
+
+struct __old_kernel_stat {
+	unsigned short     st_dev;        /* Device */
+	unsigned short     st_ino;        /* File serial number */
+	unsigned short     st_mode;       /* File mode */
+	unsigned short     st_nlink;      /* Link count */
+	unsigned short     st_uid;        /* User ID of the file's owner */
+	unsigned short     st_gid;        /* Group ID of the file's group */
+	unsigned short     st_rdev;       /* Device number, if device */
+	unsigned long      st_size;
+	unsigned long      st_atime;      /* Time of last access */
+	unsigned long      st_mtime;      /* Time of last modification */
+	unsigned long      st_ctime;      /* Time of last status change */
+};
+
+static void vstat_to_linux_old(struct __old_kernel_stat* lstat, vStat* vstat) {
+
+	int perm = vstat->writtable ? 7 : 5;
+
+	lstat->st_dev = 1; // driver major/minor
+	lstat->st_ino = 0;
+	lstat->st_mode = mkmode(vstat->type, perm, perm, perm, false, false);
+	lstat->st_nlink = 0;
+	lstat->st_uid = 0;
+	lstat->st_gid = 0;
+	lstat->st_rdev = 1; // major/minor device numbers for special files
+
+	lstat->st_size = vstat->size;
+	lstat->st_atime = vstat->atime;
+	lstat->st_mtime = vstat->mtime;
+	lstat->st_ctime = vstat->mtime;
+
+}
+
+struct stat {
+	unsigned long      st_dev;        /* Device */
+	unsigned long      st_ino;        /* File serial number */
+	unsigned int       st_mode;       /* File mode */
+	unsigned int       st_nlink;      /* Link count */
+	unsigned int       st_uid;        /* User ID of the file's owner */
+	unsigned int       st_gid;        /* Group ID of the file's group */
+	unsigned long      st_rdev;       /* Device number, if device */
+	unsigned long      __pad1;
+	long               st_size;       /* Size of file, in bytes */
+	int                st_blksize;    /* Optimal block size for I/O */
+	int                __pad2;
+	long               st_blocks;     /* Number 512-byte blocks allocated */
+	long               st_atime;      /* Time of last access */
+	unsigned long      st_atime_nsec;
+	long               st_mtime;      /* Time of last modification */
+	unsigned long      st_mtime_nsec;
+	long               st_ctime;      /* Time of last status change */
+	unsigned long      st_ctime_nsec;
+	unsigned int       __unused4;
+	unsigned int       __unused5;
+};
+
+static void vstat_to_linux_32(struct stat* lstat, vStat* vstat) {
+
+	int perm = vstat->writtable ? 7 : 5;
+
+	lstat->st_dev = 1; // driver major/minor
+	lstat->st_ino = 0;
+	lstat->st_mode = mkmode(vstat->type, perm, perm, perm, false, false);
+	lstat->st_nlink = 0;
+	lstat->st_uid = 0;
+	lstat->st_gid = 0;
+	lstat->st_rdev = 1; // major/minor device numbers for special files
+
+	// size
+	lstat->st_size = vstat->size;
+	lstat->st_blksize = 512;
+	lstat->st_blocks = vstat->blocks;
+
+	// time
+	lstat->st_atime = vstat->atime;
+	lstat->st_atime_nsec = 0;
+	lstat->st_mtime = vstat->mtime;
+	lstat->st_mtime_nsec = 0;
+	lstat->st_ctime = vstat->mtime;
+	lstat->st_ctime_nsec = 0;
+
+}
+
+struct stat64 {
+	unsigned long long st_dev;        /* Device */
+	unsigned long long st_ino;        /* File serial number */
+	unsigned           st_mode;       /* File mode */
+	unsigned int       st_nlink;      /* Link count */
+	unsigned int       st_uid;        /* User ID of the file's owner */
+	unsigned int       st_gid;        /* Group ID of the file's group */
+	unsigned long long st_rdev;       /* Device number, if device  */
+	unsigned long long __pad1;
+	long long          st_size;       /* Size of file, in bytes */
+	int                st_blksize;    /* Optimal block size for I/O */
+	int                __pad2;
+	long long          st_blocks;     /* Number 512-byte blocks allocated */
+	int                st_atime;      /* Time of last access */
+	unsigned int       st_atime_nsec;
+	int                st_mtime;      /* Time of last modification */
+	unsigned int       st_mtime_nsec;
+	int                st_ctime;      /* Time of last status change */
+	unsigned int       st_ctime_nsec;
+	unsigned int       __unused4;
+	unsigned int       __unused5;
+};
+
+static void vstat_to_linux_64(struct stat64* lstat, vStat* vstat) {
+
+	int perm = vstat->writtable ? 7 : 5;
+
+	lstat->st_dev = 1; // driver major/minor
+	lstat->st_ino = 0;
+	lstat->st_mode = mkmode(vstat->type, perm, perm, perm, false, false);
+	lstat->st_nlink = 0;
+	lstat->st_uid = 0;
+	lstat->st_gid = 0;
+	lstat->st_rdev = 1; // major/minor device numbers for special files
+
+	// size
+	lstat->st_size = vstat->size;
+	lstat->st_blksize = 512;
+	lstat->st_blocks = vstat->blocks;
+
+	// time
+	lstat->st_atime = vstat->atime;
+	lstat->st_atime_nsec = 0;
+	lstat->st_mtime = vstat->mtime;
+	lstat->st_mtime_nsec = 0;
+	lstat->st_ctime = vstat->mtime;
+	lstat->st_ctime_nsec = 0;
+
+}
+
+static int stat(const char* filename, void* statbuf, void (*converter) (void* dst, vStat* src), int flags) {
+
+	vRef cwd = fd_cwd();
+	vRef vref;
+	vStat stat;
+	int res = 0;
+
+	if (res = vfs_open(&vref, &cwd, filename, flags)) {
+		return res;
+	}
+
+	if (res = vfs_stat(&vref, &stat)) {
+		return res;
+	}
+
+	if (res = vfs_close(&vref)) {
+		return res;
+	}
+
+	converter(statbuf, &stat);
+	return 0;
+
+}
+
+static int fstat(unsigned int fd, void* statbuf, void (*converter) (void* dst, vStat* src)) {
+
+	vRef* vref = fd_resolve(fd);
+	vStat stat;
+	int res = 0;
+
+	if (!vref) {
+		return -LINUX_EBADF;
+	}
+
+	if (res = vfs_stat(&vref, &stat)) {
+		return res;
+	}
+
+	converter(statbuf, &stat);
+	return 0;
+}
 
 /* input/output */
 
@@ -406,6 +585,42 @@ static int sys_old_readdir(unsigned int fd, struct old_linux_dirent* buffer, uns
 		bytes += entry.name_length;
 	}
 
+}
+
+static int sys_stat(const char* filename, struct __old_kernel_stat* statbuf) {
+	return stat(filename, statbuf, vstat_to_linux_old, /* Do follow links */ 0);
+}
+
+static int sys_fstat(unsigned int fd, struct __old_kernel_stat* statbuf) {
+	return fstat(fd, statbuf, vstat_to_linux_old);
+}
+
+static int sys_lstat(const char* filename, struct __old_kernel_stat* statbuf) {
+	return stat(filename, statbuf, vstat_to_linux_old, OPEN_NOFOLLOW);
+}
+
+static int sys_newstat(const char* filename, struct stat* statbuf) {
+	return stat(filename, statbuf, vstat_to_linux_32, /* Do follow links */ 0);
+}
+
+static int sys_newlstat(const char* filename, struct stat* statbuf) {
+	return stat(filename, statbuf, vstat_to_linux_32, OPEN_NOFOLLOW);
+}
+
+static int sys_newfstat(unsigned int fd, struct stat* statbuf) {
+	return fstat(fd, statbuf, vstat_to_linux_32);
+}
+
+static int sys_stat64(const char* filename, struct stat64* statbuf) {
+	return stat(filename, statbuf, vstat_to_linux_64, /* Do follow links */ 0);
+}
+
+static int sys_lstat64(const char* filename, struct stat64* statbuf) {
+	return stat(filename, statbuf, vstat_to_linux_64, OPEN_NOFOLLOW);
+}
+
+static int sys_fstat64(unsigned long fd, struct stat64* statbuf) {
+	return fstat(fd, statbuf, vstat_to_linux_64);
 }
 
 #define SYSCALL_ENTRY(args, function) {.adapter = syscall_adapter_fn##args, .handler = (void*) (function)}
