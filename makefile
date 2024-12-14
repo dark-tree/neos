@@ -21,6 +21,9 @@ KERNEL_CC = \
 	build/kernel/print.o \
 	build/kernel/memory.o \
 	build/kernel/math.o \
+	build/kernel/io.o \
+	build/kernel/floppy.o \
+	build/kernel/fat.o
 	build/kernel/interrupt.o \
 	build/kernel/syscall.o \
 	build/kernel/scheduler.o \
@@ -36,7 +39,7 @@ CC = gcc -m32 -fno-pie -std=gnu99 -Wall -Wextra $(CC_FLAGS) -O0 -c
 AS = nasm -f elf32
 OC = objcopy -O binary
 
-.PHONY : clean all run debug
+.PHONY : clean image all run debug
 
 # Create the build directory
 build: src/kernel/systable.h
@@ -91,8 +94,12 @@ src/kernel/systable.h: util/sysgen.py
 	rm -f src/kernel/systable.h
 	python3 util/sysgen.py > src/kernel/systable.h
 
+# Generate the floppy disk image with FAT filesystem
+image:
+	$(MAKE) makefile -C ./disks image 
+
 # Build all
-all: build/final.iso
+all: build/final.iso image
 
 # Remove all build elements
 clean:
@@ -101,11 +108,11 @@ clean:
 # Invoke QEMU wihtout waiting for GDB
 run: build/final.iso
 	rm -f ./output
-	qemu-system-i386 -monitor stdio -cdrom ./build/final.iso -boot a -d cpu_reset -D ./output
+	qemu-system-i386 -monitor stdio -cdrom ./build/final.iso -boot a -drive file=./disks/floppy.img,if=floppy,index=1,format=raw -d cpu_reset -D ./output
 
 # Invoke QEMU and wait for GDB
 debug: build/final.iso build/kernel.dwarf
-	qemu-system-i386 -singlestep -cdrom ./build/final.iso -boot a -s -S &
+	qemu-system-i386 -singlestep -cdrom ./build/final.iso -boot a -s -S -drive file=./disks/floppy.img,if=floppy,index=1,format=raw &
 	gdb -ex 'target remote localhost:1234' -ex 'symbol-file build/kernel.dwarf' -ex 'break *0x8000' -ex 'c'
 
 disasm: build/bootloader.bin

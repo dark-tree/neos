@@ -1,6 +1,7 @@
 
 #include "types.h"
 #include "console.h"
+#include "floppy.h"
 #include "print.h"
 #include "interrupt.h"
 #include "util.h"
@@ -10,6 +11,8 @@
 #include "vfs.h"
 #include "memory.h"
 #include "procfs.h"
+
+void start() __attribute__((section(".text.start")));
 
 extern char asm_test();
 extern void pic_disable();
@@ -59,7 +62,6 @@ void start() {
 	kprintf("Return: %d\n", res);
 
 	scheduler_init();
-
 	scheduler_create_process(-1, getprocess1());
 	scheduler_create_process(-1, getprocess2());
 
