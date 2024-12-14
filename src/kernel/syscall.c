@@ -112,7 +112,7 @@ static int fd_open(vRef* parent, const char* filename, int flags) {
 	}
 
 	int caller = scheduler_get_current_pid();
-	int fd = scheduler_fput(new_file, caller);
+	int fd = scheduler_fput(caller, new_file);
 
 	// scheduler_fput uses 0 as error code...
 	if (fd == 0) {
@@ -400,6 +400,18 @@ static int sys_mkdir(const char* pathname, int mode) {
 	(void) mode;
 
 	return vfs_mkdir(&cwd, pathname);
+}
+
+static int sys_mkdirat(int fd, const char* pathname, int mode) {
+
+	vRef* parent = fd_resolve(fd);
+	if (!parent) {
+		return -LINUX_EBADF;
+	}
+
+	(void) mode;
+
+	return vfs_mkdir(parent, pathname);
 }
 
 static int sys_readlink(const char* path, char* buf, int size) {
@@ -717,6 +729,24 @@ static int sys_rmdir(const char* pathname) {
 	}
 
 	return 0;
+}
+
+static int sys_chdir(const char* path) {
+
+	vRef cwd = fd_cwd();
+	vRef vref;
+	int res = 0;
+
+	if (res = vfs_open(&vref, &cwd, path, OPEN_DIRECTORY)) {
+		return res;
+	}
+
+	int caller = scheduler_get_current_pid();
+	scheduler_chdir(caller, &vref);
+	vfs_close(&cwd);
+
+	return 0;
+
 }
 
 #define SYSCALL_ENTRY(args, function) {.adapter = syscall_adapter_fn##args, .handler = (void*) (function)}

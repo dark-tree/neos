@@ -38,7 +38,9 @@ int scheduler_load_process_info(ProcessDescriptor* processInfo, int pid);
 
 int scheduler_process_list(int* pid);
 
-int scheduler_fput(vRef vref, int pid);
+void scheduler_chdir(int pid, vRef* cwd);
+
+int scheduler_fput(int pid, vRef vref);
 
 vRef* scheduler_fget(int pid, int fd);
 

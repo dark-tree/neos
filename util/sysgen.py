@@ -31,7 +31,8 @@ spec_impl = [
 	"sys_close",
 	"sys_unlink",
 	"sys_unlinkat",
-	"sys_rmdir"
+	"sys_rmdir",
+	"sys_mkdirat"
 ]
 
 # Add all syscalls implemented in ASM at the interrupt level here

@@ -352,7 +352,7 @@ int vfs_list(vRef* vref, vEntry* entries, int max);
 int vfs_mkdir(vRef* vref, const char* name);
 
 /**
- *
+ * @brief Perform a filesystem-independent file unlink()/rmdir() operation
  */
 int vfs_remove(vRef* vref, bool rmdir);
 
