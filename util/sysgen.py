@@ -14,7 +14,11 @@ spec_impl = [
 	"sys_creat",
 	"sys_lseek",
 	"sys_openat",
-	"sys_mkdir"
+	"sys_mkdir",
+	"sys_readlink",
+	"sys_getdents64",
+	"sys_getdents",
+	"sys_old_readdir"
 ]
 
 # Add all syscalls implemented in ASM at the interrupt level here

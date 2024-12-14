@@ -121,6 +121,34 @@ static int fd_open(vRef* parent, const char* filename, int flags) {
 	return fd;
 }
 
+struct old_linux_dirent {
+	unsigned long d_ino;      /* inode number */
+	unsigned long d_offset;   /* offset to this old_linux_dirent */
+	unsigned short d_namlen;  /* length of this d_name */
+	char  d_name[];           /* filename (null-terminated) */
+};
+
+struct linux_dirent {
+	unsigned long  d_ino;     /* Inode number */
+	unsigned long  d_off;     /* Not an offset; see below */
+	unsigned short d_reclen;  /* Length of this linux_dirent */
+	char           d_name[];  /* Filename (null-terminated) */
+                              /* length is actually (d_reclen - 2 -
+                                 offsetof(struct linux_dirent, d_name)) */
+    /*
+	char           pad;       // Zero padding byte
+	char           d_type;    // File type (only since Linux 2.6.4); offset is (d_reclen - 1)
+	*/
+};
+
+struct linux_dirent64 {
+	uint64_t       d_ino;     /* 64-bit inode number */
+	uint64_t       d_off;     /* Not an offset; see getdents() */
+	unsigned short d_reclen;  /* Size of this dirent */
+	unsigned char  d_type;    /* File type */
+	char           d_name[];  /* Filename (null-terminated) */
+};
+
 /* input/output */
 
 static int sys_write(int fd, char* buffer, int bytes) {
@@ -198,6 +226,186 @@ static int sys_readlink(const char* path, char* buf, int size) {
 	vRef cwd = fd_cwd();
 
 	return vfs_readlink(&cwd, path, buf, size);
+}
+
+static int sys_getdents(unsigned int fd, struct linux_dirent* buffer, unsigned int size) {
+
+	vRef* vref = fd_resolve(fd);
+
+	if (!vref) {
+		return -LINUX_EBADF;
+	}
+
+	int bytes = 0;
+
+	while (true) {
+
+		vEntry entry;
+		int count = vfs_list(vref, &entry, 1);
+
+		// nothing left to list
+		if (count == 0) {
+			return bytes;
+		}
+
+		// check for error
+		if (count < 0) {
+			return count;
+		}
+
+		int esz = sizeof(struct linux_dirent) + entry.name_length + 2;
+		int left = size - bytes;
+
+		// check if we run out of space in output buffer
+		if (left < esz) {
+
+			// undo last list call
+			vfs_seek(vref, entry.seek_offset, SEEK_SET);
+
+			// if we loaded nothing and still run out of space the buffer was too small
+			if (bytes == 0) {
+				return -LINUX_EINVAL;
+			}
+
+			// ... otehrwise return the number of bytes written
+			return bytes;
+		}
+
+		// next entry pointer
+		struct linux_dirent* dirent = ((void*) buffer) + bytes;
+
+		dirent->d_ino = 0; // inode
+		dirent->d_off = entry.seek_offset;
+		dirent->d_reclen = sizeof(struct linux_dirent) + entry.name_length + 2;
+
+		memcpy(dirent->d_name, entry.name, entry.name_length);
+
+		// extension
+		dirent->d_name[entry.name_length + 1] = 0;          // one byte after name (pad)
+		dirent->d_name[entry.name_length + 2] = entry.type; // two bytes after name (d_type)
+
+		// now move forward in output buffer
+		bytes += dirent->d_reclen;
+	}
+
+}
+
+static int sys_getdents64(unsigned int fd, struct linux_dirent64* buffer, unsigned int size) {
+
+	vRef* vref = fd_resolve(fd);
+
+	if (!vref) {
+		return -LINUX_EBADF;
+	}
+
+	int bytes = 0;
+
+	while (true) {
+
+		vEntry entry;
+		int count = vfs_list(vref, &entry, 1);
+
+		// nothing left to list
+		if (count == 0) {
+			return bytes;
+		}
+
+		// check for error
+		if (count < 0) {
+			return count;
+		}
+
+		int esz = sizeof(struct linux_dirent64) + entry.name_length;
+		int left = size - bytes;
+
+		// check if we run out of space in output buffer
+		if (left < esz) {
+
+			// undo last list call
+			vfs_seek(vref, entry.seek_offset, SEEK_SET);
+
+			// if we loaded nothing and still run out of space the buffer was too small
+			if (bytes == 0) {
+				return -LINUX_EINVAL;
+			}
+
+			// ... otehrwise return the number of bytes written
+			return bytes;
+		}
+
+		// next entry pointer
+		struct linux_dirent64* dirent = ((void*) buffer) + bytes;
+
+		dirent->d_ino = 0; // inode
+		dirent->d_off = entry.seek_offset;
+		dirent->d_reclen = sizeof(struct linux_dirent) + entry.name_length;
+		dirent->d_type = entry.type;
+
+		memcpy(dirent->d_name, entry.name, entry.name_length);
+
+		// now move forward in output buffer
+		bytes += dirent->d_reclen;
+	}
+
+}
+
+static int sys_old_readdir(unsigned int fd, struct old_linux_dirent* buffer, unsigned int size) {
+
+	vRef* vref = fd_resolve(fd);
+
+	if (!vref) {
+		return -LINUX_EBADF;
+	}
+
+	int bytes = 0;
+
+	while (true) {
+
+		vEntry entry;
+		int count = vfs_list(vref, &entry, 1);
+
+		// nothing left to list
+		if (count == 0) {
+			return bytes;
+		}
+
+		// check for error
+		if (count < 0) {
+			return count;
+		}
+
+		int esz = sizeof(struct old_linux_dirent) + entry.name_length;
+		int left = size - bytes;
+
+		// check if we run out of space in output buffer
+		if (left < esz) {
+
+			// undo last list call
+			vfs_seek(vref, entry.seek_offset, SEEK_SET);
+
+			// if we loaded nothing and still run out of space the buffer was too small
+			if (bytes == 0) {
+				return -LINUX_EINVAL;
+			}
+
+			// ... otehrwise return the number of bytes written
+			return bytes;
+		}
+
+		// next entry pointer
+		struct old_linux_dirent* dirent = ((void*) buffer) + bytes;
+
+		dirent->d_ino = 0; // inode
+		dirent->d_offset = entry.seek_offset;
+		dirent->d_namlen = entry.name_length;
+
+		memcpy(dirent->d_name, entry.name, entry.name_length);
+
+		// now move forward in output buffer
+		bytes += sizeof(struct old_linux_dirent);
+		bytes += entry.name_length;
+	}
+
 }
 
 #define SYSCALL_ENTRY(args, function) {.adapter = syscall_adapter_fn##args, .handler = (void*) (function)}
