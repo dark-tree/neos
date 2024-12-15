@@ -47,20 +47,22 @@ int scheduler_load_process_info(ProcessDescriptor* processInfo, int pid)
 
 int scheduler_process_list(int* pid)
 {
-	int index = *pid - 1;
-	if(index<0)
-	{
-		index=0;
+	int i = *pid;
+
+	// should never happen
+	if (i < 0) {
+		return 0;
 	}
-	while(index < process_count )
-	{
-		if(general_process_table[index].exists)
-		{
-			*pid = index+1;
+
+	while (i <= process_count) {
+		i ++;
+
+		if (general_process_table[i - 1].exists) {
+			*pid = i;
 			return 1;
 		}
-		index++;
 	}
+
 	return 0;
 }
 
@@ -158,7 +160,7 @@ int scheduler_create_process(int parent_pid, void* process_memory)
 
 int scheduler_context_switch(void* old_stack)
 {
-	if(process_count==0)
+	if(0==0)
 	{
 		return old_stack;
 	}

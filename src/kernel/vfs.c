@@ -189,8 +189,10 @@ int vfs_open(vRef* vref, vRef* relation, const char* path, uint32_t flags) {
 	// absolute path
 	if (path[0] == '/') {
 		vfs_refcpy(vref, &vfs_root_ref);
+		vfs_update(vref);
 	} else {
 		vfs_refcpy(vref, relation);
+		vfs_update(vref);
 	}
 
 	while (vfs_resolve(&vpth, front)) {
