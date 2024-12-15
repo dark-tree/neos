@@ -7,12 +7,14 @@
 #include "util.h"
 #include "cursor.h"
 #include "mem.h"
+
 #include "scheduler.h"
 #include "vfs.h"
 #include "memory.h"
 #include "procfs.h"
 
 void start() __attribute__((section(".text.start")));
+
 
 extern char asm_test();
 extern void pic_disable();
@@ -33,8 +35,7 @@ void start() {
 	pic_disable();
 	int_init();
 
-//	kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m%#0.8x\e[m again!\n", "sweet", 'r', -1920);
-
+//  kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m%#0.8x\e[m again!\n", "sweet", 'r', -1920);
 //	kprintf("\e[4B");
 //	kprintf("\e[29C" X S S S X S X X X X S S X X X S S X X X X"\n");
 //	kprintf("\e[29C" X X S S X S S S S S S X S S S X S S S S S"\n");
