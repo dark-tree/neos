@@ -159,7 +159,7 @@ int scheduler_create_process(int parent_pid, vRef* processFile)
     {
         return 1;
     }
-    uint32_t size = 0/*kmsz(image.image) */; //TODO: Wont't work - need to merge kmsz branch into this one and uncomment
+    uint32_t size = kmsz(image.image);
     void* stack = image.image + size;
     stack = isr_stub_stack(stack, image.entry, 2, 1);
     scheduler_new_entry(parent_pid, stack, image.image);
