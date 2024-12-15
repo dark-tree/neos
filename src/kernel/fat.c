@@ -138,12 +138,32 @@ static void fat_file_default(fat_FILE* file, fat_DISK* disk) {
 	}
 }
 
-static unsigned int fat_read_fat_entry(fat_DISK* disk, unsigned int cluster) {
+static unsigned char fat_cache[512];
+static unsigned int fat_cache_sector = 0xFFFFFFFF;
+
+static void fat_invalid_cache() {
+	fat_cache_sector = 0xFFFFFFFF;
+}
+
+static unsigned int fat_read_fat_entry(fat_DISK* disk, unsigned int cluster, unsigned char cache) {
 	unsigned int fat_offset = disk->bpb.BPB_RsvdSecCnt * disk->bpb.BPB_BytsPerSec;
 
 	// Each entry is 4 bytes long
 	unsigned int fat_entry = fat_offset + cluster * 4;
-	disk->read_func((unsigned char*)&fat_entry, fat_entry, sizeof(fat_entry), disk->user_args);
+
+	if (cache) {
+		unsigned int sector = fat_entry / disk->bpb.BPB_BytsPerSec;
+		if (sector != fat_cache_sector) {
+			disk->read_func(fat_cache, sector * disk->bpb.BPB_BytsPerSec, disk->bpb.BPB_BytsPerSec, disk->user_args);
+			fat_cache_sector = sector;
+		}
+		return *((unsigned int*)(fat_cache + (fat_entry % disk->bpb.BPB_BytsPerSec)));
+	}
+	else {
+		unsigned int value;
+		disk->read_func((unsigned char*)&value, fat_entry, sizeof(value), disk->user_args);
+		return value;
+	}
 
 	return fat_entry;
 }
@@ -181,12 +201,14 @@ unsigned char fat_fread(void* data_out, unsigned int element_size, unsigned int 
 
 	unsigned int data_size = element_size * element_count;
 
+	fat_invalid_cache();
+
 	while (1) {
 		if (current_file_cluster < 2) {
 			break;
 		}
 
-		unsigned int next_cluster = fat_read_fat_entry(file->disk, current_file_cluster);
+		unsigned int next_cluster = fat_read_fat_entry(file->disk, current_file_cluster, 1);
 
 		if (next_cluster == 0x0) {
 			// Cluster is free
@@ -222,8 +244,9 @@ unsigned char fat_fread(void* data_out, unsigned int element_size, unsigned int 
 
 			// Read the part of the cluster that is needed
 			// subtract the size of the cluster because it has already been added to the total size
-			file->disk->read_func((unsigned char*)data_out + read_total_bytes, src_read_offset, bytes_to_read, file->disk->user_args);
-
+			if (bytes_to_read > 0) {
+				file->disk->read_func((unsigned char*)data_out + read_total_bytes, src_read_offset, bytes_to_read, file->disk->user_args);
+			}
 			read_total_bytes += bytes_to_read;
 		}
 
@@ -251,12 +274,14 @@ unsigned int fat_file_cluster_count(fat_FILE* file) {
 	unsigned int next_cluster = 0;
 	unsigned int cluster_count = 0;
 
+	fat_invalid_cache();
+
 	while (1) {
 		if (current_file_cluster < 2) {
 			break;
 		}
 
-		next_cluster = fat_read_fat_entry(file->disk, current_file_cluster);
+		next_cluster = fat_read_fat_entry(file->disk, current_file_cluster, 1);
 
 		if (next_cluster == 0x0FFFFFF7) {
 			// Cluster is bad
@@ -343,7 +368,7 @@ unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int 
 			break;
 		}
 
-		unsigned int next_cluster = fat_read_fat_entry(file->disk, current_file_cluster);
+		unsigned int next_cluster = fat_read_fat_entry(file->disk, current_file_cluster, 0);
 
 		if (next_cluster == 0x0FFFFFF7) {
 			// Cluster is bad
@@ -367,7 +392,8 @@ unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int 
 				// Find next free cluster
 				unsigned int disk_size = (file->disk->bpb.BPB_TotSec32 == 0) ? file->disk->bpb.BPB_TotSec16 : file->disk->bpb.BPB_TotSec32;
 				unsigned int free_cluster = current_file_cluster + 1;
-				while (fat_read_fat_entry(file->disk, free_cluster) != 0x0) {
+				fat_invalid_cache();
+				while (fat_read_fat_entry(file->disk, free_cluster, 1) != 0x0) {
 					free_cluster++;
 					if (free_cluster * file->disk->bpb.BPB_SecPerClus >= disk_size) {
 						// No free clusters
@@ -683,7 +709,7 @@ void fat_remove_fat_chain(fat_FILE* file){
 			break;
 		}
 
-		next_cluster = fat_read_fat_entry(file->disk, current_file_cluster);
+		next_cluster = fat_read_fat_entry(file->disk, current_file_cluster, 0);
 
 		if (next_cluster == 0x0FFFFFF7) {
 			// Cluster is bad
@@ -1037,7 +1063,8 @@ int fat_create(fat_FILE* new_file_out, fat_DIR* root_dir, const char* path, unsi
 	// Allocate a new cluster for the file
 	unsigned int disk_size = (parent_dir.dir_file.disk->bpb.BPB_TotSec32 == 0) ? parent_dir.dir_file.disk->bpb.BPB_TotSec16 : parent_dir.dir_file.disk->bpb.BPB_TotSec32;
 	unsigned int free_cluster = 2;
-	while (fat_read_fat_entry(parent_dir.dir_file.disk, free_cluster) != 0x0) {
+	fat_invalid_cache();
+	while (fat_read_fat_entry(parent_dir.dir_file.disk, free_cluster, 1) != 0x0) {
 		free_cluster++;
 		if (free_cluster * parent_dir.dir_file.disk->bpb.BPB_SecPerClus >= disk_size) {
 			// No free clusters
