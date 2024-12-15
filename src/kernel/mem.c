@@ -65,7 +65,7 @@ void mem_init(uint32_t offset) {
 	}
 
 	uint64_t size = high - low;
-	kset(size, low);
+	kset(size, (void*)low);
 	kprintf("Allocator arena set to %#0.8x:%#0.8x, excluding read-only blocks...\n", (int) low, (int) high);
 
 	// exclude reserved regions
@@ -76,7 +76,7 @@ void mem_init(uint32_t offset) {
 			size -= entry.length;
 
 			kprintf(" * Reserved at %#0.8x (%ud bytes)\n", (int) entry.base, (int) entry.length);
-			kmres(entry.base, entry.length);
+			kmres((void*)entry.base, entry.length);
 		}
 	}
 

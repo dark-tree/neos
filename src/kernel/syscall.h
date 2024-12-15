@@ -1,11 +1,6 @@
 #pragma once
 
 /**
- * @brief Signature of all syscall handlers.
- */
-typedef int (*syscall) (int eax, int ebx, int ecx, int edx, int esi, int edi);
-
-/**
  * @brief Invokes a x86 32 bit linux syscall.
  *
  * @param[in] eax The syscall number.

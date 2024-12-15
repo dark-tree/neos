@@ -17,8 +17,4 @@ SECTIONS {
 		*(.bss)
 	}
 
-	/* Remove unnecessary sections */
-	/DISCARD/ : {
-		*(.*);
-	}
 }

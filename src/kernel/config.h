@@ -34,3 +34,33 @@
  *        bootloader. Refere to the BIOS Function INT 0x15, EAX = 0xE820
  */
 #define MEMORY_MAP_RAM 0x500
+
+/**
+ * @brief Initial size of the process vector
+ *        inside the sheduler, that holds process descriptors.
+ */
+#define INITIAL_PROCESS_TABLE_SIZE 2
+
+/**
+ * @brief The maximal number of file
+ *        descriptors per process.
+ */
+#define MAX_FILES_PER_PROCESS 1024
+
+/**
+ * @brief The maximum length (in characters) of a single path element (file or
+ *        directory name) in a path string, including the null-byte
+ */
+#define FILE_MAX_NAME 256
+
+/**
+ * @brief The maximum number of segments (slash separated sections) in a path,
+ *        including the resolves used during link traversal.
+ */
+#define PATH_MAX_RESOLVES 64
+
+/**
+ * @brief The size of stack allocated by default to a new process,
+ *        this does not concern processes created using fork.
+ */
+#define INITIAL_STACK_SIZE 1024*32
