@@ -4,6 +4,7 @@
 #include "routine.h"
 #include "print.h"
 #include "scheduler.h"
+#include "rivendell.h"
 
 ProcessDescriptor* general_process_table;
 int process_count;
@@ -116,7 +117,10 @@ void scheduler_new_entry(int parent_index, void* stack, void* process_memory)
 
 void scheduler_remove_entry(int index)
 {
-	general_process_table[index].exists=false;
+    ProcessDescriptor* process = general_process_table+index;
+    process->exists=false;
+    kfree(process->files);
+    kfree(process->fileExists);
 }
 
 int scheduler_kill_process(int pid)
@@ -126,18 +130,14 @@ int scheduler_kill_process(int pid)
 		return 1;
 	}
 	pid--;
-
 	ProcessDescriptor* process = general_process_table+pid;
-	scheduler_remove_entry(pid);
-	//kfree(general_process_table[pid].process_memory);
-
-	vfs_close(&process->cwd);
-	kfree(process->files);
-	kfree(process->fileExists);
+    kfree(general_process_table[pid].process_memory);
+    vfs_close(&process->cwd);
+    scheduler_remove_entry(pid);
 	return 0;
 }
 
-int scheduler_create_process(int parent_pid, void* process_memory)
+int scheduler_create_process(int parent_pid, vRef* processFile)
 {
 	if(parent_pid<=0 && parent_pid!=(-1))
 	{
@@ -151,10 +151,18 @@ int scheduler_create_process(int parent_pid, void* process_memory)
 	{
 		return 1;
 	}
-	int process_size = 4096; // TODO For testing only - will be replaced with an allocator call, to check size. Followed by a krealloc call to create space for heap and stack.
-	void* stack = process_memory+process_size;
-	stack = isr_stub_stack(stack, process_memory, 2, 1);
-	scheduler_new_entry(parent_pid, stack, process_memory);
+    ProgramImage image;
+    image.prefix = 0;
+    image.sufix = INITIAL_STACK_SIZE;
+    int errorCode = elf_load(processFile, &image, true);
+    if(errorCode)
+    {
+        return 1;
+    }
+    uint32_t size = 0/*kmsz(image.image) */; //TODO: Wont't work - need to merge kmsz branch into this one and uncomment
+    void* stack = image.image + size;
+    stack = isr_stub_stack(stack, image.entry, 2, 1);
+    scheduler_new_entry(parent_pid, stack, image.image);
 	return 0;
 }
 

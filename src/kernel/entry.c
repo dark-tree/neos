@@ -55,8 +55,6 @@ void start() {
 	kprintf("System ready!\n");
 
 	scheduler_init();
-	scheduler_create_process(-1, getprocess1());
-	scheduler_create_process(-1, getprocess2());
 
 	char buffer[16];
 
