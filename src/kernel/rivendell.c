@@ -120,7 +120,7 @@ static int elf_checkident(Elf32_Ident* ident) {
 	return 0;
 }
 
-static int elf_segcpy(vRef* vref, void* image, uint32_t mount, ImageSegment* segment) {
+static int elf_segcpy(vRef* vref, void* image, uint32_t mount, ImageSegment* segment, bool verbose) {
 
 	// seek to the segment contents
 	vfs_seek(vref, segment->file_offset, SEEK_SET);
@@ -129,7 +129,9 @@ static int elf_segcpy(vRef* vref, void* image, uint32_t mount, ImageSegment* seg
 	uint32_t content = min(segment->file_size, segment->mem_size);
 	uint32_t padding = max(0, (long) segment->mem_size - (long) segment->file_size);
 
-	kprintf("[+0x%.8x] Copying %u file bytes, and %u null bytes\n", address, content, padding);
+	if (verbose) {
+		kprintf("[+0x%0.8x] Copying %ud file bytes, and %ud null bytes\n", address, content, padding);
+	}
 
 	if (vfs_read(vref, image + address, content) == 0) {
 		return ELF_READ_ERROR;
@@ -139,10 +141,12 @@ static int elf_segcpy(vRef* vref, void* image, uint32_t mount, ImageSegment* seg
 	return ELF_SUCCESS;
 }
 
-static int elf_segments(vRef* vref, const Elf32_Ehdr* header, ProgramImage* program) {
+static int elf_segments(vRef* vref, const Elf32_Ehdr* header, ProgramImage* program, bool verbose) {
 
-	kprintf("\nSegments: \n");
-	kprintf("\e[1m   type align    offset   vaddr    filesz   memsz\e[m\n");
+	if (verbose) {
+		kprintf("\nSegments: \n");
+		kprintf("\e[1m   type align    offset   vaddr    filesz   memsz\e[m\n");
+	}
 
 	// copy of loadable segments for future use
 	// used to not read the file multiple times
@@ -181,22 +185,26 @@ static int elf_segments(vRef* vref, const Elf32_Ehdr* header, ProgramImage* prog
 			phlcnt ++;
 		}
 
-		kprintf(" * %s %.8x %.8x %.8x %.8x %.8x\n", elf_phtypestr(entry.type), entry.align, entry.offset, entry.vaddr, entry.filesz, entry.memsz);
+		if (verbose) {
+			kprintf(" * %s %0.8x %0.8x %0.8x %0.8x %0.8x\n", elf_phtypestr(entry.type), entry.align, entry.offset, entry.vaddr, entry.filesz, entry.memsz);
+		}
 	}
 
 	uint32_t bytes = high - low;
 
-	kprintf("\nProgram: \n");
-	kprintf(" * phlcnt : %u\n", phlcnt);
-	kprintf(" * memory : %#.8x:%#.8x (%d bytes)\n", low, high, bytes);
+	if (verbose) {
+		kprintf("\nProgram: \n");
+		kprintf(" * phlcnt : %ud\n", phlcnt);
+		kprintf(" * memory : %#0.8x:%#0.8x (%d bytes)\n", low, high, bytes);
+		kprintf("\n");
+	}
 
-	kprintf("\n");
-	void* image = kmalloc(bytes);
+	void* image = kmalloc(bytes + program->prefix + program->sufix);
 
 	for (int i = 0; i < phlcnt; i ++) {
 		int err;
 
-		if ((err = elf_segcpy(vref, image, low, phlptr + i)) != ELF_SUCCESS) {
+		if ((err = elf_segcpy(vref, image + program->prefix, low, phlptr + i, verbose)) != ELF_SUCCESS) {
 			kfree(phlptr);
 			return err;
 		}
@@ -222,7 +230,7 @@ const char* elf_err(int err) {
 }
 
 
-int elf_load(vRef* vref, ProgramImage* image) {
+int elf_load(vRef* vref, ProgramImage* image, bool verbose) {
 
 	Elf32_Ehdr header;
 
@@ -260,15 +268,17 @@ int elf_load(vRef* vref, ProgramImage* image) {
 //		return ELF_HEADER_ERROR;
 //	}
 
-	kprintf("Header: \n");
-	kprintf(" * entry    : %#.8x\n", (uint32_t) header.entry);
-	kprintf(" * phoff    : %#.8x (count: %.2d, size: %.2d)\n", (uint32_t) header.phoff, (uint32_t) header.phnum, (uint32_t) header.phentsize);
-	kprintf(" * shoff    : %#.8x (count: %.2d, size: %.2d)\n", (uint32_t) header.shoff, (uint32_t) header.shnum, (uint32_t) header.shentsize);
-	kprintf(" * shstrndx : %u\n", (uint32_t) header.shstrndx);
+	if (verbose) {
+		kprintf("Header: \n");
+		kprintf(" * entry    : %#0.8x\n", (uint32_t) header.entry);
+		kprintf(" * phoff    : %#0.8x (count: %0.2d, size: %0.2d)\n", (uint32_t) header.phoff, (uint32_t) header.phnum, (uint32_t) header.phentsize);
+		kprintf(" * shoff    : %#0.8x (count: %0.2d, size: %0.2d)\n", (uint32_t) header.shoff, (uint32_t) header.shnum, (uint32_t) header.shentsize);
+		kprintf(" * shstrndx : %ud\n", (uint32_t) header.shstrndx);
+	}
 
 	int err;
 
-	if ((err = elf_segments(vref, &header, image)) != ELF_SUCCESS) {
+	if ((err = elf_segments(vref, &header, image, verbose)) != ELF_SUCCESS) {
 		return err;
 	}
 
