@@ -50,7 +50,7 @@ jmp proc1ptl
 
 
 
-times 4096 db 0
+times 8192 db 0
 
 
 
@@ -71,7 +71,7 @@ jmp proc2ptl
 
 
 
-times 4096 db 0
+times 8192 db 0
 
 process1text: db `Im process 1! Hello! Iteration: %d! `, 0
 process2text: db 'Im process 2! Hello! Iteration: %d!', 0

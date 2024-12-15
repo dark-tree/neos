@@ -13,6 +13,9 @@
 #include "procfs.h"
 #include "fatfs.h"
 #include "routine.h"
+#include "kmalloc.h"
+#include "fat.h"
+#include "rivendell.h"
 
 void start() __attribute__((section(".text.start")));
 
@@ -66,12 +69,28 @@ void start() {
 	int res = vfs_open(&ref, &root, "./abcd/../tmp/haha.txt", 0);
 	kprintf("Return: %d\n", res);
 
-	vfs_open(&ref, &root, "./abc/foo/test.txt", OPEN_CREAT);
-	res = vfs_write(&ref, "Hello, World!\n", 14);
-	kprintf("Return: %d\n", res);
-	res = vfs_write(&ref, "Hello, World!\n", 14);
-	kprintf("Return: %d\n", res);
-	//halt();
+	//vfs_open(&ref, &root, "./abc/foo/test.txt", OPEN_CREAT);
+	//res = vfs_write(&ref, "Hello, World!\n", 14);
+	//kprintf("Return: %d\n", res);
+	//res = vfs_write(&ref, "Hello, World!\n", 14);
+	//kprintf("Return: %d\n", res);
+
+	vfs_open(&ref, &root, "./executable/elf", 0);
+	int size = vfs_seek(&ref, 0, SEEK_END);
+	vfs_seek(&ref, 0, SEEK_SET);
+	//char* buffer = kmalloc(size);
+	//vfs_read(&ref, buffer, size);
+
+	// ELF file is loaded!
+	//fat_print_buffer(buffer, 128);
+
+	ProgramImage image;
+	elf_load(&ref, &image);
+
+
+	//kfree(buffer);
+
+	halt();
 
 	scheduler_init();
 	scheduler_create_process(-1, getprocess1());

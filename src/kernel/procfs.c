@@ -63,7 +63,7 @@ int procfs_stat(vRef* vref, vStat* stat) {
 	return LINUX_EIO; // TODO
 }
 
-int procfs_readlink(vRef* vref, const char* name, const char* buffer, int size) {
+int procfs_readlink(vRef* vref, const char* name, char* buffer, int size) {
 	kprintf("procfs: readlink\n");
 	return LINUX_EIO; // TODO
 }

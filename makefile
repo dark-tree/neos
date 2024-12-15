@@ -81,7 +81,7 @@ build/floppy.img: build build/boot/load.bin build/boot/start.bin build/kernel/ke
 	dd if=/dev/zero of=build/floppy.img bs=1024 count=1440
 	dd if=build/boot/load.bin of=build/floppy.img bs=512 seek=0 count=1 conv=notrunc
 	dd if=build/boot/start.bin of=build/floppy.img bs=512 seek=1 count=1 conv=notrunc
-	dd if=build/kernel/kernel.bin of=build/floppy.img bs=512 seek=2 count=127 conv=notrunc
+	dd if=build/kernel/kernel.bin of=build/floppy.img bs=512 seek=2 count=200 conv=notrunc
 
 # Wrap into a ISO image file
 build/final.iso: build build/floppy.img
@@ -114,7 +114,7 @@ run: build/final.iso disks/floppy.img
 
 # Invoke QEMU and wait for GDB
 debug: build/final.iso build/kernel.dwarf disks/floppy.img
-	qemu-system-i386 -singlestep -cdrom ./build/final.iso -boot a -s -S -drive file=./disks/floppy.img,if=floppy,index=1,format=raw &
+	qemu-system-i386 -cdrom ./build/final.iso -boot a -s -S -drive file=./disks/floppy.img,if=floppy,index=1,format=raw &
 	gdb -ex 'target remote localhost:1234' -ex 'symbol-file build/kernel.dwarf' -ex 'break *0x8000' -ex 'c'
 
 disasm: build/bootloader.bin

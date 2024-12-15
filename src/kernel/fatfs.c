@@ -42,7 +42,6 @@ int fatfs_root(vRef* dst) {
 		dst->state = state;
 		state->is_dir = true;
 		fat_copy_DIR(&state->dir, &disk.root_directory);
-		//kprintf("fatfs: root success\n");
 		return 0;
 	}
 	kprintf("fatfs: root fail\n");
@@ -63,8 +62,12 @@ int fatfs_open(vRef* vref, const char* basename, uint32_t flags) {
 
 	state_data* state = vref->state;
 
-	if (state == NULL || !state->is_dir) {
+	if (state == NULL) {
 		return LINUX_EIO;
+	}
+
+	if (!state->is_dir) {
+		return LINUX_ENOTDIR;
 	}
 
 	fat_DIR parent_dir = state->dir;
@@ -106,8 +109,9 @@ int fatfs_read(vRef* vref, void* buffer, uint32_t size) {
 	}
 	else {
 		fat_FILE* file = &state->file;
+		int cursor = fat_ftell(file);
 		if (fat_fread(buffer, 1, size, file)) {
-			return 0;
+			return fat_ftell(file) - cursor;
 		}
 	}
 
@@ -124,8 +128,9 @@ int fatfs_write(vRef* vref, void* buffer, uint32_t size) {
 	}
 	else {
 		fat_FILE* file = &state->file;
+		int cursor = fat_ftell(file);
 		if (fat_fwrite(buffer, 1, size, file)) {
-			return 0;
+			return fat_ftell(file) - cursor;
 		}
 	}
 
@@ -245,9 +250,9 @@ int fatfs_stat(vRef* vref, vStat* stat) {
 	return 0;
 }
 
-int fatfs_readlink(vRef* vref, const char* name, const char* buffer, int size) {
+int fatfs_readlink(vRef* vref, const char* name, char* buffer, int size) {
 	kprintf("fatfs: readlink\n");
-	return LINUX_EIO; // TODO
+	return fatfs_read(vref, buffer, size);
 }
 
 /* public */
