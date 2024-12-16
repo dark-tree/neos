@@ -3,6 +3,7 @@
 #include "errno.h"
 #include "print.h"
 #include "memory.h"
+#include "scheduler.h"
 
 /* private */
 
@@ -404,16 +405,21 @@ int procfs_stat(vRef* vref, vStat* stat) {
 	return -LINUX_EIO;
 }
 
-int procfs_readlink(vRef* vref, const char* name, const char* buffer, int size) {
+int procfs_readlink(vRef* vref, const char* name, char* buffer, int size) {
 	kprintf("procfs: readlink\n");
 	ProcState* state = vref->state;
 
 	if (state->node == PROC_NODE_PROC && streq(name, "cwd")) {
-		// TODO: trace cwd path
+		ProcessDescriptor process;
+		scheduler_load_process_info(&process, state->pid);
+		vfs_trace(&process.cwd, buffer, size);
 		return 0;
 	}
 
 	if (state->node == PROC_NODE_PROC && streq(name, "exe")) {
+		ProcessDescriptor process;
+		scheduler_load_process_info(&process, state->pid);
+
 		// TODO: trace exe path
 		return 0;
 	}
@@ -428,6 +434,38 @@ int procfs_readlink(vRef* vref, const char* name, const char* buffer, int size) 
 	}
 
 	return -LINUX_EINVAL;
+}
+
+int procfs_lookup(vRef* vref, char* name) {
+	kprintf("procfs: lookup\n");
+	ProcState* state = vref->state;
+
+	if (state->node == PROC_NODE_PROC) {
+		uint_to_str(state->pid, name, 16, 10);
+		return 0;
+	}
+
+	if (state->node == PROC_NODE_FD) {
+		memcpy(name, "fd", 3);
+		return 0;
+	}
+
+	if (state->node == PROC_LEAF_CWD) {
+		memcpy(name, "cwd", 4);
+		return 0;
+	}
+
+	if (state->node == PROC_LEAF_EXE) {
+		memcpy(name, "exe", 4);
+		return 0;
+	}
+
+	if (state->node == PROC_LEAF_SELF) {
+		memcpy(name, "self", 5);
+		return 0;
+	}
+
+	return -1;
 }
 
 /* public */
@@ -448,4 +486,5 @@ void procfs_load(FilesystemDriver* driver) {
 	driver->remove = procfs_remove;
 	driver->stat = procfs_stat;
 	driver->readlink = procfs_readlink;
+	driver->lookup = procfs_lookup;
 }

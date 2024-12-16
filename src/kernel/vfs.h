@@ -283,6 +283,17 @@ typedef int (*driver_stat) (vRef* vref, vStat* stat);
  */
 typedef int (*driver_readlink) (vRef* vref, const char* name, const char* buffer, int size);
 
+/**
+ * @brief Get the name of node in a filesystem
+ *
+ * @param[in] vref    The vRef of the node that is to be queried
+ * @param[out] name   Buffer to write the name to, must be of at least FILE_MAX_NAME bytes
+ *
+ * @return Returns 0 if the name was writen or -1 if it wasn't.
+ *         This function should fail for root nodes, as they do not have a name within a mounted filesystem.
+ */
+typedef int (*driver_lookup) (vRef* vref, char* buffer);
+
 typedef struct FilesystemDriver_tag {
 	char identifier[16];
 
@@ -298,6 +309,7 @@ typedef struct FilesystemDriver_tag {
 	driver_remove   remove;
 	driver_stat     stat;
 	driver_readlink readlink;
+	driver_lookup   lookup;
 } FilesystemDriver;
 
 /**
@@ -365,6 +377,15 @@ int vfs_stat(vRef* vref, vStat* stat);
  * @brief Perform a filesystem-independent file readlink() operation
  */
 int vfs_readlink(vRef* vref, const char* name, const char* buffer, int size);
+
+/*
+ * @brief convert vRef into an absolute string path
+ *
+ * @param[in] vref   path to trace
+ * @param[out] path  buffer to write the path to
+ * @param[in] size   buffer size in bytes
+ */
+void vfs_trace(vRef* vref, char* buffer, int size);
 
 /**
  * @brief Get a reference to the root of the VFS, this can be then used to oepn paths

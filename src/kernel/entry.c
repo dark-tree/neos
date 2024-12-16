@@ -49,6 +49,7 @@ void start() {
 	FilesystemDriver procfs;
 	procfs_load(&procfs);
 	vfs_mount("/", &procfs);
+	vfs_mount("/proc/", &procfs);
 
 	vfs_print(NULL, 0);
 
@@ -64,7 +65,7 @@ void start() {
 	//vfs_open(root, "/testing/omg/tmp/test.txt");
 	vRef ref;
 
-	int res = vfs_open(&ref, &root, "/1", OPEN_NOFOLLOW);
+	int res = vfs_open(&ref, &root, "/proc/1", OPEN_NOFOLLOW);
 	kprintf("Return: %d\n", res);
 
 	vEntry* list = kmalloc(5 * sizeof(vEntry));
@@ -76,6 +77,11 @@ void start() {
 		kprintf(" * %s\n", list[i].name);
 	}
 	kfree(list);
+
+	char* path = kmalloc(128);
+	vfs_trace(&ref, path, 128);
+	kprintf("%s\n", path);
+	kfree(path);
 
 	// never return to the bootloader
 	halt();
