@@ -18,5 +18,18 @@ typedef struct {
 	void* image;
 } ProgramImage;
 
+/**
+ * @brief Translate ELF error code into a human readable string
+ */
 const char* elf_err(int err);
+
+/**
+ * @brief Load ELF file into the given ProgramImage
+ *
+ * @param[in] file       The file to read from
+ * @param[in,out] image  The struct with extra memory config, the loaded image will be stored there
+ * @param[in] verbose    Controls wheather rivendell should print debug information
+ *
+ * @return 0 or one of ELF error codes
+ */
 int elf_load(vRef* file, ProgramImage* image, bool verbose);

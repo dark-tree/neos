@@ -362,6 +362,7 @@ void vfs_trace(vRef* vref, char* output, int size) {
 	}
 
 	output[k] = 0;
+	vfs_close(&copy);
 
 }
 
