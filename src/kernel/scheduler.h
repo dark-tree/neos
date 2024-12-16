@@ -17,6 +17,7 @@ typedef struct {
     vRef* files;
     bool* fileExists;
     vRef cwd;
+    vRef exe;
 } ProcessDescriptor;
 
 
@@ -25,8 +26,6 @@ extern int scheduler_get_current_pid();
 extern int get_index(int i);
 
 extern void scheduler_init();
-
-void scheduler_new_entry(int parent_pid, void* stack, void* process_memory);
 
 int scheduler_create_process(int parent_pid, vRef* processFile);
 

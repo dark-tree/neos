@@ -52,6 +52,7 @@ int scheduler_load_process_info(ProcessDescriptor* processInfo, int pid)
 	processInfo->files = process->files;
 	processInfo->fileExists = process->fileExists;
 	processInfo->cwd = process->cwd;
+    processInfo->exe = process->exe;
 	return 0;
 }
 
@@ -90,7 +91,7 @@ void scheduler_init()
 }
 
 
-void scheduler_new_entry(int parent_index, void* stack, void* process_memory)
+void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vRef* exe)
 {
 	int index = 0;
 	while(index!=process_count && general_process_table[index].exists!=false)
@@ -113,6 +114,7 @@ void scheduler_new_entry(int parent_index, void* stack, void* process_memory)
 	new_entry->process_memory = process_memory;
 	new_entry->files = kmalloc(sizeof(vRef)*MAX_FILES_PER_PROCESS);
 	new_entry->fileExists = kmalloc(sizeof(bool)*MAX_FILES_PER_PROCESS);
+    new_entry->exe = *exe;
 
 	// TODO set this to some better value
 	new_entry->cwd = vfs_root();
@@ -163,7 +165,7 @@ int scheduler_create_process(int parent_pid, vRef* processFile)
     uint32_t size = kmsz(image.image);
     void* stack = image.image + size;
     stack = isr_stub_stack(stack, image.entry, 2, 1);
-    scheduler_new_entry(parent_pid, stack, image.image);
+    scheduler_new_entry(parent_pid, stack, image.image, processFile);
 	return 0;
 }
 
