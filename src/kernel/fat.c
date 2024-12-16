@@ -141,7 +141,7 @@ static void fat_file_default(fat_FILE* file, fat_DISK* disk) {
 static unsigned char fat_cache[512];
 static unsigned int fat_cache_sector = 0xFFFFFFFF;
 
-static void fat_invalid_cache() {
+static void fat_invalidate_cache() {
 	fat_cache_sector = 0xFFFFFFFF;
 }
 
@@ -201,7 +201,7 @@ unsigned char fat_fread(void* data_out, unsigned int element_size, unsigned int 
 
 	unsigned int data_size = element_size * element_count;
 
-	fat_invalid_cache();
+	fat_invalidate_cache();
 
 	while (1) {
 		if (current_file_cluster < 2) {
@@ -274,7 +274,7 @@ unsigned int fat_file_cluster_count(fat_FILE* file) {
 	unsigned int next_cluster = 0;
 	unsigned int cluster_count = 0;
 
-	fat_invalid_cache();
+	fat_invalidate_cache();
 
 	while (1) {
 		if (current_file_cluster < 2) {
@@ -392,7 +392,7 @@ unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int 
 				// Find next free cluster
 				unsigned int disk_size = (file->disk->bpb.BPB_TotSec32 == 0) ? file->disk->bpb.BPB_TotSec16 : file->disk->bpb.BPB_TotSec32;
 				unsigned int free_cluster = current_file_cluster + 1;
-				fat_invalid_cache();
+				fat_invalidate_cache();
 				while (fat_read_fat_entry(file->disk, free_cluster, 1) != 0x0) {
 					free_cluster++;
 					if (free_cluster * file->disk->bpb.BPB_SecPerClus >= disk_size) {
@@ -1063,7 +1063,7 @@ int fat_create(fat_FILE* new_file_out, fat_DIR* root_dir, const char* path, unsi
 	// Allocate a new cluster for the file
 	unsigned int disk_size = (parent_dir.dir_file.disk->bpb.BPB_TotSec32 == 0) ? parent_dir.dir_file.disk->bpb.BPB_TotSec16 : parent_dir.dir_file.disk->bpb.BPB_TotSec32;
 	unsigned int free_cluster = 2;
-	fat_invalid_cache();
+	fat_invalidate_cache();
 	while (fat_read_fat_entry(parent_dir.dir_file.disk, free_cluster, 1) != 0x0) {
 		free_cluster++;
 		if (free_cluster * parent_dir.dir_file.disk->bpb.BPB_SecPerClus >= disk_size) {

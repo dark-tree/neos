@@ -322,7 +322,7 @@ static int fstat(unsigned int fd, void* statbuf, void (*converter) (void* dst, v
 		return -LINUX_EBADF;
 	}
 
-	if (res = vfs_stat(&vref, &stat)) {
+	if (res = vfs_stat(vref, &stat)) {
 		return res;
 	}
 
@@ -602,39 +602,39 @@ static int sys_old_readdir(unsigned int fd, struct old_linux_dirent* buffer, uns
 }
 
 static int sys_stat(const char* filename, struct __old_kernel_stat* statbuf) {
-	return stat(filename, statbuf, vstat_to_linux_old, /* Do follow links */ 0);
+	return stat(filename, statbuf, (void(*)(void*, vStat*))vstat_to_linux_old, /* Do follow links */ 0);
 }
 
 static int sys_fstat(unsigned int fd, struct __old_kernel_stat* statbuf) {
-	return fstat(fd, statbuf, vstat_to_linux_old);
+	return fstat(fd, statbuf, (void(*)(void*, vStat*))vstat_to_linux_old);
 }
 
 static int sys_lstat(const char* filename, struct __old_kernel_stat* statbuf) {
-	return stat(filename, statbuf, vstat_to_linux_old, OPEN_NOFOLLOW);
+	return stat(filename, statbuf, (void(*)(void*, vStat*))vstat_to_linux_old, OPEN_NOFOLLOW);
 }
 
 static int sys_newstat(const char* filename, struct stat* statbuf) {
-	return stat(filename, statbuf, vstat_to_linux_32, /* Do follow links */ 0);
+	return stat(filename, statbuf, (void(*)(void*, vStat*))vstat_to_linux_32, /* Do follow links */ 0);
 }
 
 static int sys_newlstat(const char* filename, struct stat* statbuf) {
-	return stat(filename, statbuf, vstat_to_linux_32, OPEN_NOFOLLOW);
+	return stat(filename, statbuf, (void(*)(void*, vStat*))vstat_to_linux_32, OPEN_NOFOLLOW);
 }
 
 static int sys_newfstat(unsigned int fd, struct stat* statbuf) {
-	return fstat(fd, statbuf, vstat_to_linux_32);
+	return fstat(fd, statbuf, (void(*)(void*, vStat*))vstat_to_linux_32);
 }
 
 static int sys_stat64(const char* filename, struct stat64* statbuf) {
-	return stat(filename, statbuf, vstat_to_linux_64, /* Do follow links */ 0);
+	return stat(filename, statbuf, (void(*)(void*, vStat*))vstat_to_linux_64, /* Do follow links */ 0);
 }
 
 static int sys_lstat64(const char* filename, struct stat64* statbuf) {
-	return stat(filename, statbuf, vstat_to_linux_64, OPEN_NOFOLLOW);
+	return stat(filename, statbuf, (void(*)(void*, vStat*))vstat_to_linux_64, OPEN_NOFOLLOW);
 }
 
 static int sys_fstat64(unsigned long fd, struct stat64* statbuf) {
-	return fstat(fd, statbuf, vstat_to_linux_64);
+	return fstat(fd, statbuf, (void(*)(void*, vStat*))vstat_to_linux_64);
 }
 
 static int sys_close(unsigned int fd) {

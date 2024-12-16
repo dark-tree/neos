@@ -76,19 +76,10 @@ void start() {
 	//kprintf("Return: %d\n", res);
 
 	vfs_open(&ref, &root, "./executable/elf", 0);
-	int size = vfs_seek(&ref, 0, SEEK_END);
-	vfs_seek(&ref, 0, SEEK_SET);
-	//char* buffer = kmalloc(size);
-	//vfs_read(&ref, buffer, size);
-
-	// ELF file is loaded!
-	//fat_print_buffer(buffer, 128);
 
 	ProgramImage image;
-	elf_load(&ref, &image);
-
-
-	//kfree(buffer);
+	int load_result = elf_load(&ref, &image);
+	kprintf("ELF Load: %d\n", load_result);
 
 	halt();
 

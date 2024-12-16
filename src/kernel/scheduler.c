@@ -149,7 +149,7 @@ int scheduler_create_process(int parent_pid, void* process_memory)
 	{
 		return 1;
 	}
-	int process_size = 4096; // TODO For testing only - will be replaced with an allocator call, to check size. Followed by a krealloc call to create space for heap and stack.
+	int process_size = 8192; // TODO For testing only - will be replaced with an allocator call, to check size. Followed by a krealloc call to create space for heap and stack.
 	void* stack = process_memory+process_size;
 	stack = isr_stub_stack(stack, process_memory, 2, 1);
 	scheduler_new_entry(parent_pid, stack, process_memory);
@@ -160,7 +160,7 @@ int scheduler_context_switch(void* old_stack)
 {
 	if(process_count==0)
 	{
-		return old_stack;
+		return (int)old_stack;
 	}
 	general_process_table[process_running].stack = old_stack;
 	process_running++;

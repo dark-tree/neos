@@ -7,6 +7,9 @@
 #include "memory.h"
 #include "util.h"
 
+//#define FATFS_DEBUG_LOG kprintf
+#define FATFS_DEBUG_LOG
+
 /* private */
 
 void read_func(unsigned char* data_out, unsigned int offset_in, unsigned int size_in, void* user_args) {
@@ -30,10 +33,10 @@ typedef struct state_data_s {
 /* exported */
 
 int fatfs_root(vRef* dst) {
-	kprintf("fatfs: root\n");
+	FATFS_DEBUG_LOG("fatfs: root\n");
 
 	if (!floppy_init()){
-		kprintf("fatfs: floppy init fail\n");
+		FATFS_DEBUG_LOG("fatfs: floppy init fail\n");
 		return LINUX_EIO;
 	}
 
@@ -44,12 +47,12 @@ int fatfs_root(vRef* dst) {
 		fat_copy_DIR(&state->dir, &disk.root_directory);
 		return 0;
 	}
-	kprintf("fatfs: root fail\n");
+	FATFS_DEBUG_LOG("fatfs: root fail\n");
 	return LINUX_EIO;
 }
 
 int fatfs_clone(vRef* dst, vRef* src) {
-	kprintf("fatfs: clone\n");
+	FATFS_DEBUG_LOG("fatfs: clone\n");
 
 	dst->state = kmalloc(sizeof(state_data));
 	memcpy(dst->state, src->state, sizeof(state_data));
@@ -58,7 +61,7 @@ int fatfs_clone(vRef* dst, vRef* src) {
 }
 
 int fatfs_open(vRef* vref, const char* basename, uint32_t flags) {
-	kprintf("fatfs: open %s\n", basename);
+	FATFS_DEBUG_LOG("fatfs: open %s\n", basename);
 
 	state_data* state = vref->state;
 
@@ -75,7 +78,7 @@ int fatfs_open(vRef* vref, const char* basename, uint32_t flags) {
 	if (flags & OPEN_DIRECTORY) {
 		if (fat_opendir(&state->dir, &parent_dir, basename)) {
 			state->is_dir = true;
-			kprintf("fatfs: dopen success\n");
+			FATFS_DEBUG_LOG("fatfs: dopen success\n");
 			return 0;
 		}
 		// TODO: report ENOTDIR if the file is not a directory and open failed
@@ -84,7 +87,7 @@ int fatfs_open(vRef* vref, const char* basename, uint32_t flags) {
 		const char* mode = (flags & OPEN_APPEND) ? "a" : (flags & OPEN_CREAT) ? "w" : "r";
 		if (fat_fopen(&state->file, &parent_dir, basename, mode)) {
 			state->is_dir = false;
-			kprintf("fatfs: fopen success\n");
+			FATFS_DEBUG_LOG("fatfs: fopen success\n");
 			return 0;
 		}
 		// TODO: report EEXIST if the file exists 
@@ -94,13 +97,13 @@ int fatfs_open(vRef* vref, const char* basename, uint32_t flags) {
 }
 
 int fatfs_close(vRef* vref) {
-	kprintf("fatfs: close\n");
+	FATFS_DEBUG_LOG("fatfs: close\n");
 	kfree(vref->state);
 	return 0;
 }
 
 int fatfs_read(vRef* vref, void* buffer, uint32_t size) {
-	kprintf("fatfs: read %d\n", size);
+	FATFS_DEBUG_LOG("fatfs: read %d\n", size);
 
 	state_data* state = vref->state;
 
@@ -119,7 +122,7 @@ int fatfs_read(vRef* vref, void* buffer, uint32_t size) {
 }
 
 int fatfs_write(vRef* vref, void* buffer, uint32_t size) {
-	kprintf("fatfs: write %d\n", size);
+	FATFS_DEBUG_LOG("fatfs: write %d\n", size);
 
 	state_data* state = vref->state;
 
@@ -138,7 +141,7 @@ int fatfs_write(vRef* vref, void* buffer, uint32_t size) {
 }
 
 int fatfs_seek(vRef* vref, int offset, int whence) {
-	kprintf("fatfs: seek %d\n", offset);
+	FATFS_DEBUG_LOG("fatfs: seek %d\n", offset);
 
 	state_data* state = vref->state;
 
@@ -159,7 +162,7 @@ int fatfs_seek(vRef* vref, int offset, int whence) {
 }
 
 int fatfs_list(vRef* vref, vEntry* entries, int max) {
-	kprintf("fatfs: list\n");
+	FATFS_DEBUG_LOG("fatfs: list\n");
 
 	state_data* state = vref->state;
 
@@ -188,7 +191,7 @@ int fatfs_list(vRef* vref, vEntry* entries, int max) {
 }
 
 int fatfs_mkdir(vRef* vref, const char* name) {
-	kprintf("fatfs: mkdir %s\n", name);
+	FATFS_DEBUG_LOG("fatfs: mkdir %s\n", name);
 
 	state_data* state = vref->state;
 
@@ -209,7 +212,7 @@ int fatfs_mkdir(vRef* vref, const char* name) {
 }
 
 int fatfs_remove(vRef* vref, bool rmdir) {
-	kprintf("fatfs: remove\n");
+	FATFS_DEBUG_LOG("fatfs: remove\n");
 
 	// TODO: non-recursive remove
 
@@ -235,7 +238,7 @@ int fatfs_remove(vRef* vref, bool rmdir) {
 }
 
 int fatfs_stat(vRef* vref, vStat* stat) {
-	kprintf("fatfs: stat\n");
+	FATFS_DEBUG_LOG("fatfs: stat\n");
 
 	state_data* state = vref->state;
 	fat_FILE* file = (state->is_dir) ? &state->dir.dir_file : &state->file;
@@ -251,7 +254,7 @@ int fatfs_stat(vRef* vref, vStat* stat) {
 }
 
 int fatfs_readlink(vRef* vref, const char* name, char* buffer, int size) {
-	kprintf("fatfs: readlink\n");
+	FATFS_DEBUG_LOG("fatfs: readlink\n");
 	return fatfs_read(vref, buffer, size);
 }
 
