@@ -37,7 +37,7 @@ int fatfs_root(vRef* dst) {
 
 	if (!floppy_init()){
 		FATFS_DEBUG_LOG("fatfs: floppy init fail\n");
-		return LINUX_EIO;
+		return -LINUX_EIO;
 	}
 
 	if (fat_init(&disk, read_func, write_func, 0)) {
@@ -48,7 +48,7 @@ int fatfs_root(vRef* dst) {
 		return 0;
 	}
 	FATFS_DEBUG_LOG("fatfs: root fail\n");
-	return LINUX_EIO;
+	return -LINUX_EIO;
 }
 
 int fatfs_clone(vRef* dst, vRef* src) {
@@ -66,11 +66,11 @@ int fatfs_open(vRef* vref, const char* basename, uint32_t flags) {
 	state_data* state = vref->state;
 
 	if (state == NULL) {
-		return LINUX_EIO;
+		return -LINUX_EIO;
 	}
 
 	if (!state->is_dir) {
-		return LINUX_ENOTDIR;
+		return -LINUX_ENOTDIR;
 	}
 
 	fat_DIR parent_dir = state->dir;
@@ -93,7 +93,7 @@ int fatfs_open(vRef* vref, const char* basename, uint32_t flags) {
 		// TODO: report EEXIST if the file exists 
 	}
 
-	return LINUX_EIO;
+	return -LINUX_EIO;
 }
 
 int fatfs_close(vRef* vref) {
@@ -108,7 +108,7 @@ int fatfs_read(vRef* vref, void* buffer, uint32_t size) {
 	state_data* state = vref->state;
 
 	if (state->is_dir) {
-		return LINUX_EISDIR;
+		return -LINUX_EISDIR;
 	}
 	else {
 		fat_FILE* file = &state->file;
@@ -118,7 +118,7 @@ int fatfs_read(vRef* vref, void* buffer, uint32_t size) {
 		}
 	}
 
-	return LINUX_EIO;
+	return -LINUX_EIO;
 }
 
 int fatfs_write(vRef* vref, void* buffer, uint32_t size) {
@@ -127,7 +127,7 @@ int fatfs_write(vRef* vref, void* buffer, uint32_t size) {
 	state_data* state = vref->state;
 
 	if (state->is_dir) {
-		return LINUX_EISDIR;
+		return -LINUX_EISDIR;
 	}
 	else {
 		fat_FILE* file = &state->file;
@@ -137,7 +137,7 @@ int fatfs_write(vRef* vref, void* buffer, uint32_t size) {
 		}
 	}
 
-	return LINUX_EIO;
+	return -LINUX_EIO;
 }
 
 int fatfs_seek(vRef* vref, int offset, int whence) {
@@ -158,7 +158,7 @@ int fatfs_seek(vRef* vref, int offset, int whence) {
 			return file->cursor;
 		}
 	}
-	return LINUX_EIO;
+	return -LINUX_EIO;
 }
 
 int fatfs_list(vRef* vref, vEntry* entries, int max) {
@@ -187,7 +187,7 @@ int fatfs_list(vRef* vref, vEntry* entries, int max) {
 		return 0;
 	}
 
-	return LINUX_EIO;
+	return -LINUX_EIO;
 }
 
 int fatfs_mkdir(vRef* vref, const char* name) {
@@ -200,7 +200,7 @@ int fatfs_mkdir(vRef* vref, const char* name) {
 		parent_dir = &state->dir;
 	}
 	else {
-		return LINUX_ENOTDIR;
+		return -LINUX_ENOTDIR;
 	}
 
 	fat_DIR new_dir;
@@ -208,7 +208,7 @@ int fatfs_mkdir(vRef* vref, const char* name) {
 		return 0;
 	}
 
-	return LINUX_EROFS;
+	return -LINUX_EROFS;
 }
 
 int fatfs_remove(vRef* vref, bool rmdir) {
@@ -225,7 +225,7 @@ int fatfs_remove(vRef* vref, bool rmdir) {
 			}
 		}
 		else {
-			return LINUX_EISDIR;
+			return -LINUX_EISDIR;
 		}
 	}
 	else {
@@ -234,7 +234,7 @@ int fatfs_remove(vRef* vref, bool rmdir) {
 		}
 	}
 
-	return LINUX_EIO;
+	return -LINUX_EIO;
 }
 
 int fatfs_stat(vRef* vref, vStat* stat) {
