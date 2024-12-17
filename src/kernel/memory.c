@@ -55,3 +55,33 @@ int wstrlen(const short* wstr) {
 
 	return length;
 }
+
+int streq(const char* lcstr, const char* rcstr) {
+
+	int i = 0;
+
+	while (true) {
+
+		char ca = lcstr[i];
+		char cb = rcstr[i];
+
+		if (ca != cb) {
+			return false;
+		}
+
+		if (ca == 0) {
+			break;
+		}
+
+		i ++;
+
+	}
+
+	return true;
+}
+
+int strcpy(char* buffer, const char* cstr) {
+	int length = strlen(cstr);
+	memcpy(buffer, cstr, length);
+	return length;
+}

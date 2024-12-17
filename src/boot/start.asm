@@ -34,8 +34,6 @@ start:
 	mov fs, ax
 	mov gs, ax
 
-
-
 	; Set the code segment using a far-jump
 	jmp 0x08:0x8000
 

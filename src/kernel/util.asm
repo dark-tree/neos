@@ -113,25 +113,26 @@ dump:
 
 asm_test:
 
-	; This invokes the switch-stack interrupt
-	int 0x01
-	call halt
-
-	push hello
-	call strlen
-	add esp, 4
-
-	; Invoke Linux syscall 'sys_write'
-	mov edx, eax   ; String length
-	mov eax, 0x04  ; Write
-	mov ebx, 0     ; File Descriptor (ignored)
-	mov ecx, hello ; Buffer pointer
+	; open("abc/foo/test.txt", O_WRONL | O_CREAT, 0);
+	mov eax, 0x05      ; sys_open
+	mov ebx, test_path ; Path
+	mov ecx, 16        ; Length
+	mov edx, 0         ; Mode
 	int 0x80
+
+	; write(fd, "Hello!", 6)
+	mov ebx, eax       ; File Descriptor
+	mov eax, 0x04      ; sys_write
+	mov ecx, test_writ ; Data
+	mov edx, 6         ; Length
 	ret
 
 section .data
 
-	panic_format:        db `\e[1;31mKernel Panic had occured, restart the system to continue!\n%s\e[m\n\n`
+	test_path: db "abc/foo/test.txt", 0
+	test_writ: db "Hello!", 0
+
+	panic_format:        db `\e[1;31mKernel Panic had occured, restart the system to continue!\n%s\e[m\n\n`, 0
 	line_eax_ebx:  db `   \e[1;37mEAX\e[m: %#u0.8x, \e[1;37mEBX\e[m: %#u0.8x\n`, 0
 	line_ecx_edx:  db `   \e[1;37mECX\e[m: %#u0.8x, \e[1;37mEDX\e[m: %#u0.8x\n`, 0
 	line_esi_edi:  db `   \e[1;37mESI\e[m: %#u0.8x, \e[1;37mEDI\e[m: %#u0.8x\n\n`, 0
@@ -139,5 +140,3 @@ section .data
 	line_es_fs_gs: db `   \e[1;37mES\e[m: %#u0.4x, \e[1;37mFS\e[m: %#u0.4x, \e[1;37mGS\e[m: %#u0.4x\n\n`, 0
 	line_begin:    db "   ", 0xda, `\e[1;37mESP\e[m`, 0xc4, 0xc4, 0xc4, 0xbf, "  ", 0xda, `\e[1;37mEBP\e[m`, 0xc4, 0xc4, 0xc4, 0xbf, "  ", 0xda, `\e[1;37mRET\e[m`, 0xc4, 0xc4, 0xc4, 0xbf, `\n`, 0
 	line_stack:    db `   \e[1;37m%u0.8x\e[m: %u0.8x  %u0.8x  %u0.8x  %u0.8x\n`, 0
-
-	hello: db 0x9B, "1;35mHello Linux Compatible System!", 0x0A, 0x9B, "m", 0

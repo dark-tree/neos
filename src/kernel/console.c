@@ -3,6 +3,7 @@
 #include "ansi.h"
 #include "math.h"
 #include "config.h"
+#include "cursor.h"
 
 /* private */
 

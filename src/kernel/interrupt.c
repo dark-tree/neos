@@ -8,6 +8,8 @@
 #include "pic.h"
 #include "syscall.h"
 
+static void context_switch(int number, int error, int* eax, int ecx, int edx, int ebx, int esi, int edi);
+
 /* private */
 
 // Used by the wait subsystem
@@ -20,6 +22,7 @@ static void int_debug_handle(int number, int error, int* eax, int ecx, int edx, 
 	kprintf(" * EAX=%#x, EBX=%#x\n", *eax, ebx);
 	kprintf(" * ECX=%#x, EDX=%#x\n", ecx, edx);
 	kprintf(" * ESI=%#x, EDI=%#x\n", esi, edi);
+    halt();
 }
 
 // Forward syscalls to the syscall system
@@ -57,13 +60,6 @@ void int_wait() {
 	}
 }
 
-extern int_go_bonkers();
-
-void int_gone_bonkers() {
-	panic("Just a test, panic() called from int_gone_bonkers()");
-	halt();
-}
-
 void int_init() {
 
 	// init the wait subsystem
@@ -78,9 +74,9 @@ void int_init() {
 		isr_register(i, int_debug_handle);
 	}
 
-	isr_register(0x20, NULL);             // stop the timer spam
-	isr_register(0x01, int_go_bonkers);   // the forbidden interrupt:tm:
 	isr_register(0x80, int_linux_handle); // forward syscalls to the syscall system
+	isr_register(0x20, context_switch);   // stop the timer spam, route timer interrupts to the scheduler
+	isr_register(0x26, NULL);             // stop the floppy spam
 
 	// Point the processor at the IDT and enable interrupts
 	idtr_store(MEMORY_MAP_IDT, 0x81);

@@ -59,3 +59,24 @@ int strlen(const char* cstr);
  * @return Returns The length of the null-terminated wide string.
  */
 int wstrlen(const short* wstr);
+
+/**
+ * @brief Check if two strings are equal
+ *
+ * @param[in] lcstr Pointer to the null-terminated c-string.
+ * @param[in] rcstr Pointer to the null-terminated c-string.
+ *
+ * @return Returns 1 if the strings are equal, 0 otherwise.
+ */
+int streq(const char* lcstr, const char* rcstr);
+
+/**
+ * @brief Copies `bytes` bytes from `cstr` to `buffer`. The memory blocks must not overlap,
+ *        if they do, consider using `memmove()` with strlen().
+ *
+ * @param[out] buffer Pointer to the destination array where the content is to be copied to.
+ * @param[in]  cstr   Pointer to the source of data to be copied, must be a null-terminated c-string.
+ *
+ * @return Returns the length string copied.
+ */
+int strcpy(char* buffer, const char* cstr);
