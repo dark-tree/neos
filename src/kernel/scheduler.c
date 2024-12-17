@@ -6,7 +6,7 @@
 #include "scheduler.h"
 #include "rivendell.h"
 #include "tables.h"
-
+#include "gdt.h"
 
 
 ProcessDescriptor* general_process_table;
@@ -14,6 +14,8 @@ int process_count;
 int process_table_size = INITIAL_PROCESS_TABLE_SIZE;
 
 int process_running;
+
+int processes_existing;
 
 bool scheduler_pid_invalid(int pid)
 {
@@ -55,6 +57,7 @@ int scheduler_load_process_info(ProcessDescriptor* processInfo, int pid)
 	processInfo->cwd = process->cwd;
 	processInfo->exe = process->exe;
     processInfo->mount = process->mount;
+    processInfo->processSegmentsIndex = process->processSegmentsIndex;
 	return 0;
 }
 
@@ -92,7 +95,7 @@ void scheduler_init()
 }
 
 
-void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vRef* exe, uint32_t mount)
+void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vRef* exe, uint32_t mount, int processSegmentIndex)
 {
 	int index = 0;
 	while(index!=process_count && general_process_table[index].exists!=false)
@@ -117,6 +120,7 @@ void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vR
 	new_entry->fileExists = kmalloc(sizeof(bool)*MAX_FILES_PER_PROCESS);
 	new_entry->exe = *exe;
     new_entry->mount = mount;
+    new_entry->processSegmentsIndex = processSegmentIndex;
 
 	// TODO set this to some better value
 	new_entry->cwd = vfs_root();
@@ -126,6 +130,7 @@ void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vR
 		new_entry->fileExists[i] = false;
 	}
 	new_entry->state = RUNNABLE;
+    process_count++;
 }
 
 void scheduler_remove_entry(int index)
@@ -157,7 +162,7 @@ int scheduler_create_process(int parent_pid, vRef* processFile)
 		return 1;
 	}
 	ProgramImage image;
-	image.prefix = 0;
+    image.prefix = 134512640;
 	image.sufix = INITIAL_STACK_SIZE;
 	int errorCode = elf_load(processFile, &image, true);
 	if(errorCode)
@@ -166,11 +171,10 @@ int scheduler_create_process(int parent_pid, vRef* processFile)
 	}
 	uint32_t size = kmsz(image.image);
 	void* stack = image.image + size;
-	stack = isr_stub_stack(stack, image.entry, 2, 1);
     int virtualStack = ((stack - image.image) - image.prefix)+image.mount;
-    int dataSegmentIndex;
-    int codeSegmentIndex;
-    scheduler_new_entry(parent_pid, virtualStack, image.image, processFile, image.mount);
+    int processSegmentIndex = gput(image.image, size);
+    stack = isr_stub_stack(stack, image.entry, processSegmentIndex+1, processSegmentIndex);
+    scheduler_new_entry(parent_pid, virtualStack, image.image, processFile, image.mount, processSegmentIndex);
 	return 0;
 }
 
@@ -265,4 +269,14 @@ int scheduler_fremove(int pid, int fd)
 	return 0;
 
 	return 1;
+}
+
+int scheduler_move_process(int pid, void* new_address)
+{
+    if(scheduler_pid_invalid(pid))
+    {
+        return 1;
+    }
+    general_process_table[pid-1].process_memory = new_address;
+    return 0;
 }

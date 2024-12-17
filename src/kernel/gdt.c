@@ -66,3 +66,32 @@ void grm(int i)
     gdt[i] = EMPTY_GDT_ENTRY;
     gdt[i+1] = EMPTY_GDT_ENTRY;
 }
+
+void gad(int i, uint32_t offset, uint32_t size)
+{
+     size = size>>10;
+     uint32_t size_low = (size<<16)>>16;
+     uint32_t size_high = size>>16;
+     uint32_t offset_low = (offset<<16)>>16;
+     uint32_t offset_highmid = offset>>16;
+     uint32_t offset_mid = offset_highmid & 0xFF;
+     uint32_t offset_high = offset_highmid>>8;
+
+     uint64_t mask = offset_high;
+     mask = mask << 8;
+     mask = mask | size_high;
+     mask = mask << 16;
+     mask = mask | offset_mid;
+     mask = mask << 16;
+     mask = mask | offset_low;
+     mask = mask << 16;
+     mask = mask | size_low;
+
+     uint64_t code = EMPTY_CODE;
+     uint64_t data = EMPTY_GDT_ENTRY;
+     code = code | mask;
+     data = data | mask;
+
+     gdt[i] = code;
+     gdt[i+1] = data;
+}

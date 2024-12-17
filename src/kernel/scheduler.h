@@ -28,6 +28,8 @@ extern int get_index(int i);
 
 extern void scheduler_init();
 
+int scheduler_move_process(int pid, void* new_address);
+
 int scheduler_create_process(int parent_pid, vRef* processFile);
 
 int scheduler_context_switch(void* old_stack);

@@ -57,16 +57,26 @@ void start() {
 
 	// for now mount /proc at /
 	FilesystemDriver procfs;
-	//procfs_load(&procfs);
-	fatfs_load(&procfs);
-	vfs_mount("/", &procfs);
-	vfs_mount("/proc/", &procfs);
+    procfs_load(&procfs);
+    vfs_mount("/proc/", &procfs);
+
+    FilesystemDriver fatfs;
+    fatfs_load(&fatfs);
+    vfs_mount("/", &fatfs);
 
 	vfs_print(NULL, 0);
 
 	kprintf("System ready!\n");
 
+    vRef root = vfs_root();
+    vRef elf;
+    vfs_open(&elf, &root, "/executable/elf", 0);
+
     scheduler_init();
+
+    scheduler_create_process(-1, &elf);
+
+
 
 	// never return to the bootloader
 	halt();

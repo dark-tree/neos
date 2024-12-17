@@ -815,6 +815,35 @@ static int sys_newuname(struct new_utsname* uname) {
 	return 0;
 }
 
+static int sys_brk(unsigned long brk)
+{
+    ProcessDescriptor process;
+    int caller = scheduler_get_current_pid();
+    scheduler_load_process_info(&process, caller);
+    int memory_address = process.process_memory;
+    int size = kmsz(memory_address);
+    int end_address = memory_address + size - 1;
+    if(end_address>=brk)
+    {
+        return end_address;
+    }
+    int new_process_memory = krealloc(memory_address, size+(brk-end_address));
+    if(new_process_memory == 0)
+    {
+        panic("System out of memory - brk cannot be executed");
+    }
+    int actualNewSize = kmsz(new_process_memory);
+    gad(process.processSegmentsIndex, new_process_memory, actualNewSize);
+    scheduler_move_process(caller, new_process_memory);
+    return actualNewSize;
+}
+
+static int sys_exit(int error_code)
+{
+    kprintf("Exited with code: %d\n", error_code);
+    halt();
+}
+
 #define SYSCALL_ENTRY(args, function) {.adapter = syscall_adapter_fn##args, .handler = (void*) (function)}
 #define SYSCALL_IMPL
 #include "systable.h"
@@ -825,7 +854,7 @@ int sys_linux(int eax, int ebx, int ecx, int edx, int esi, int edi) {
 	if (eax >= SYS_LINUX_SIZE) {
 		panic("Invalid syscall number!");
 	}
-
+    kprintf("Invoked: %d\n", eax);
 	SyscallEntry* entry = sys_linux_table + eax;
 	return entry->adapter(entry, ebx, ecx, edx, esi, edi);
 }

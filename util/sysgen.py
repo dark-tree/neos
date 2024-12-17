@@ -39,11 +39,12 @@ spec_impl = [
 	"sys_uname",
 	"sys_olduname",
 	"sys_newuname",
+    "sys_brk",
+    "sys_exit",
 ]
 
 # Add all syscalls implemented in ASM at the interrupt level here
 spec_nude = [
-	"sys_exit"
 ]
 
 output += "\n"
