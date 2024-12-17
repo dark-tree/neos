@@ -324,7 +324,7 @@ static bool floppy_write_sector(uint8_t head, uint8_t cylinder, uint8_t sector, 
     // for some reason, the msr is not ready after writing no matter how long you wait
     // so we just wait shorter than usual, because it's not going to work anyway
     // I literally issue the read command in the same way and it works, but the write command doesn't
-    if (!floppy_wait_ready(0xffff)){
+    if (!floppy_wait_ready(0xff)){
         floppy_debug_msg("Error: Floppy not ready after write\n");
         // absolutely unacceptable, but I ran out of ideas, TODO: fix this
         floppy_reset();  

@@ -2,11 +2,11 @@
 
 all: image run
 
-image:
+image: build
 	@echo "Creating floppy image..."
 	dd if=/dev/zero of=floppy.img count=1440 bs=1k
 	mkfs.msdos -F 32 floppy.img
-	mcopy -s -i floppy.img files/ ::/
+	viewer/build/main -l
 
 build:
 	@echo "Building..."
@@ -21,3 +21,4 @@ clean:
 run: build
 	@echo "Running..."
 	viewer/build/main
+

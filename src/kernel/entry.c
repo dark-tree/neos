@@ -12,6 +12,11 @@
 #include "vfs.h"
 #include "memory.h"
 #include "procfs.h"
+#include "fatfs.h"
+#include "routine.h"
+#include "kmalloc.h"
+#include "fat.h"
+#include "rivendell.h"
 
 void start() __attribute__((section(".text.start")));
 
@@ -34,6 +39,9 @@ void start() {
 	pic_disable();
 	int_init();
 
+  // FIXME move to int_init(), calling it here is INVALID
+	isr_register(0x26, NULL);
+  
 //  kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m%#0.8x\e[m again!\n", "sweet", 'r', -1920);
 //	kprintf("\e[4B");
 //	kprintf("\e[29C" X S S S X S X X X X S S X X X S S X X X X"\n");
@@ -47,7 +55,8 @@ void start() {
 
 	// for now mount /proc at /
 	FilesystemDriver procfs;
-	procfs_load(&procfs);
+	//procfs_load(&procfs);
+	fatfs_load(&procfs);
 	vfs_mount("/", &procfs);
 	vfs_mount("/proc/", &procfs);
 

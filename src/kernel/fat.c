@@ -5,6 +5,8 @@
     #define NULL 0
 #endif
 
+#define fat_DEBUG
+
 /* private helper functions */
 
 static char to_lowercase(char c) {
@@ -136,12 +138,32 @@ static void fat_file_default(fat_FILE* file, fat_DISK* disk) {
 	}
 }
 
-static unsigned int fat_read_fat_entry(fat_DISK* disk, unsigned int cluster) {
+static unsigned char fat_cache[512];
+static unsigned int fat_cache_sector = 0xFFFFFFFF;
+
+static void fat_invalidate_cache() {
+	fat_cache_sector = 0xFFFFFFFF;
+}
+
+static unsigned int fat_read_fat_entry(fat_DISK* disk, unsigned int cluster, unsigned char cache) {
 	unsigned int fat_offset = disk->bpb.BPB_RsvdSecCnt * disk->bpb.BPB_BytsPerSec;
 
 	// Each entry is 4 bytes long
 	unsigned int fat_entry = fat_offset + cluster * 4;
-	disk->read_func((unsigned char*)&fat_entry, fat_entry, sizeof(fat_entry), disk->user_args);
+
+	if (cache) {
+		unsigned int sector = fat_entry / disk->bpb.BPB_BytsPerSec;
+		if (sector != fat_cache_sector) {
+			disk->read_func(fat_cache, sector * disk->bpb.BPB_BytsPerSec, disk->bpb.BPB_BytsPerSec, disk->user_args);
+			fat_cache_sector = sector;
+		}
+		return *((unsigned int*)(fat_cache + (fat_entry % disk->bpb.BPB_BytsPerSec)));
+	}
+	else {
+		unsigned int value;
+		disk->read_func((unsigned char*)&value, fat_entry, sizeof(value), disk->user_args);
+		return value;
+	}
 
 	return fat_entry;
 }
@@ -158,7 +180,7 @@ static void fat_write_fat_entry(fat_DISK* disk, unsigned int cluster, unsigned i
 	disk->write_func((unsigned char*)&value, fat_entry + fat_size, sizeof(value), disk->user_args);
 }
 
-void fat_fread(void* data_out, unsigned int element_size, unsigned int element_count, fat_FILE* file) {
+unsigned char fat_fread(void* data_out, unsigned int element_size, unsigned int element_count, fat_FILE* file) {
 	/*
 	* In order to read the contents of a file, first we need to read the DIR_FstClusLO value from the directory entry.
 	* This value is the first cluster of the file where the data is stored.
@@ -179,12 +201,14 @@ void fat_fread(void* data_out, unsigned int element_size, unsigned int element_c
 
 	unsigned int data_size = element_size * element_count;
 
+	fat_invalidate_cache();
+
 	while (1) {
 		if (current_file_cluster < 2) {
 			break;
 		}
 
-		unsigned int next_cluster = fat_read_fat_entry(file->disk, current_file_cluster);
+		unsigned int next_cluster = fat_read_fat_entry(file->disk, current_file_cluster, 1);
 
 		if (next_cluster == 0x0) {
 			// Cluster is free
@@ -220,8 +244,9 @@ void fat_fread(void* data_out, unsigned int element_size, unsigned int element_c
 
 			// Read the part of the cluster that is needed
 			// subtract the size of the cluster because it has already been added to the total size
-			file->disk->read_func((unsigned char*)data_out + read_total_bytes, src_read_offset, bytes_to_read, file->disk->user_args);
-
+			if (bytes_to_read > 0) {
+				file->disk->read_func((unsigned char*)data_out + read_total_bytes, src_read_offset, bytes_to_read, file->disk->user_args);
+			}
 			read_total_bytes += bytes_to_read;
 		}
 
@@ -240,6 +265,8 @@ void fat_fread(void* data_out, unsigned int element_size, unsigned int element_c
 	}
 
 	file->cursor += read_total_bytes;
+
+	return 1;
 }
 
 unsigned int fat_file_cluster_count(fat_FILE* file) {
@@ -247,12 +274,14 @@ unsigned int fat_file_cluster_count(fat_FILE* file) {
 	unsigned int next_cluster = 0;
 	unsigned int cluster_count = 0;
 
+	fat_invalidate_cache();
+
 	while (1) {
 		if (current_file_cluster < 2) {
 			break;
 		}
 
-		next_cluster = fat_read_fat_entry(file->disk, current_file_cluster);
+		next_cluster = fat_read_fat_entry(file->disk, current_file_cluster, 1);
 
 		if (next_cluster == 0x0FFFFFF7) {
 			// Cluster is bad
@@ -339,7 +368,7 @@ unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int 
 			break;
 		}
 
-		unsigned int next_cluster = fat_read_fat_entry(file->disk, current_file_cluster);
+		unsigned int next_cluster = fat_read_fat_entry(file->disk, current_file_cluster, 0);
 
 		if (next_cluster == 0x0FFFFFF7) {
 			// Cluster is bad
@@ -363,7 +392,8 @@ unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int 
 				// Find next free cluster
 				unsigned int disk_size = (file->disk->bpb.BPB_TotSec32 == 0) ? file->disk->bpb.BPB_TotSec16 : file->disk->bpb.BPB_TotSec32;
 				unsigned int free_cluster = current_file_cluster + 1;
-				while (fat_read_fat_entry(file->disk, free_cluster) != 0x0) {
+				fat_invalidate_cache();
+				while (fat_read_fat_entry(file->disk, free_cluster, 1) != 0x0) {
 					free_cluster++;
 					if (free_cluster * file->disk->bpb.BPB_SecPerClus >= disk_size) {
 						// No free clusters
@@ -435,7 +465,7 @@ unsigned char fat_fwrite(void* data_in, unsigned int element_size, unsigned int 
 	return 1;
 }
 
-void fat_fseek(fat_FILE* file, int offset, int origin) {
+int fat_fseek(fat_FILE* file, int offset, int origin) {
 	if (origin == fat_SEEK_SET) {
 		file->cursor = offset;
 	}
@@ -445,6 +475,22 @@ void fat_fseek(fat_FILE* file, int offset, int origin) {
 	else if (origin == fat_SEEK_END) {
 		file->cursor = file->fat_dir.DIR_FileSize + offset;
 	}
+
+	return 1;
+}
+
+int fat_dirseek(fat_DIR* dir, int offset, int origin) {
+	if (origin == fat_SEEK_SET) {
+		dir->dir_file.cursor = offset;
+	}
+	else if (origin == fat_SEEK_CUR) {
+		dir->dir_file.cursor += offset;
+	}
+	else if (origin == fat_SEEK_END) {
+		return 0;
+	}
+
+	return 1;
 }
 
 int fat_ftell(fat_FILE* file) {
@@ -663,7 +709,7 @@ void fat_remove_fat_chain(fat_FILE* file){
 			break;
 		}
 
-		next_cluster = fat_read_fat_entry(file->disk, current_file_cluster);
+		next_cluster = fat_read_fat_entry(file->disk, current_file_cluster, 0);
 
 		if (next_cluster == 0x0FFFFFF7) {
 			// Cluster is bad
@@ -780,54 +826,62 @@ void fat_update_lfn(fat_FILE* file, unsigned char remove) {
 	}
 }
 
+unsigned char fat_fremove(fat_FILE* file) {
+	fat_update_lfn(file, 1);
+
+	// Set the entry in the directory as free
+	file->fat_dir.DIR_Name[0] = 0xE5;
+	fat_update_entry(file);
+
+	fat_remove_fat_chain(file);
+
+	return 1;
+}
+
+unsigned char fat_dirremove(fat_DIR* dir) {
+	fat_DIR helper_dir;
+	fat_FILE helper_file;
+	
+	fat_rewinddir(dir);
+
+	while (1) {
+		int dir_entry = fat_readdir(&helper_dir, &helper_file, dir);
+
+		if (dir_entry == fat_NOT_FOUND) {
+			break;
+		}
+
+		fat_FILE* file_ptr = dir_entry == fat_FOUND_FILE ? &helper_file : &helper_dir.dir_file;
+
+		if (file_ptr->fat_dir.DIR_Name[0] == '.' || (file_ptr->fat_dir.DIR_Name[0] == '.' && file_ptr->fat_dir.DIR_Name[1] == '.')) {
+			continue;
+		}
+
+		char new_path[sizeof(file_ptr->long_filename) / 2];
+		fat_longname_to_string(file_ptr->long_filename, new_path);
+		fat_remove(dir, new_path, (file_ptr->fat_dir.DIR_Attr & fat_ATTR_DIRECTORY) == 0);
+	}
+
+	// Set the entry in the directory as free
+	dir->dir_file.fat_dir.DIR_Name[0] = 0xE5;
+	fat_update_entry(&dir->dir_file);
+
+	fat_remove_fat_chain(&dir->dir_file);
+
+	return 1;
+}
+
 unsigned char fat_remove(fat_DIR* root_dir, const char* path, unsigned char is_file) {
 	fat_DIR found_dir;
 	fat_FILE found_file;
 	int find_success = fat_find(&found_dir, &found_file, root_dir, path, is_file, 0);
 
 	if (find_success == fat_FOUND_FILE) {
-		fat_update_lfn(&found_file, 1);
-
-		// Set the entry in the directory as free
-		found_file.fat_dir.DIR_Name[0] = 0xE5;
-		fat_update_entry(&found_file);
-
-		fat_remove_fat_chain(&found_file);
-
-		return 1;
+		return fat_fremove(&found_file);
 	}
 
 	if (find_success == fat_FOUND_DIR) {
-		fat_DIR helper_dir;
-		fat_FILE helper_file;
-		
-		fat_rewinddir(&found_dir);
-
-		while (1) {
-			int dir_entry = fat_readdir(&helper_dir, &helper_file, &found_dir);
-
-			if (dir_entry == fat_NOT_FOUND) {
-				break;
-			}
-
-			fat_FILE* file_ptr = dir_entry == fat_FOUND_FILE ? &helper_file : &helper_dir.dir_file;
-
-			if (file_ptr->fat_dir.DIR_Name[0] == '.' || (file_ptr->fat_dir.DIR_Name[0] == '.' && file_ptr->fat_dir.DIR_Name[1] == '.')) {
-				continue;
-			}
-
-			char new_path[sizeof(file_ptr->long_filename) / 2];
-			fat_longname_to_string(file_ptr->long_filename, new_path);
-			fat_remove(&found_dir, new_path, (file_ptr->fat_dir.DIR_Attr & fat_ATTR_DIRECTORY) == 0);
-		}
-
-		// Set the entry in the directory as free
-		found_dir.dir_file.fat_dir.DIR_Name[0] = 0xE5;
-		fat_update_entry(&found_dir.dir_file);
-
-		fat_remove_fat_chain(&found_dir.dir_file);
-
-		return 1;
+		return fat_dirremove(&found_dir);
 	}
 
 	return 0;
@@ -1009,7 +1063,8 @@ int fat_create(fat_FILE* new_file_out, fat_DIR* root_dir, const char* path, unsi
 	// Allocate a new cluster for the file
 	unsigned int disk_size = (parent_dir.dir_file.disk->bpb.BPB_TotSec32 == 0) ? parent_dir.dir_file.disk->bpb.BPB_TotSec16 : parent_dir.dir_file.disk->bpb.BPB_TotSec32;
 	unsigned int free_cluster = 2;
-	while (fat_read_fat_entry(parent_dir.dir_file.disk, free_cluster) != 0x0) {
+	fat_invalidate_cache();
+	while (fat_read_fat_entry(parent_dir.dir_file.disk, free_cluster, 1) != 0x0) {
 		free_cluster++;
 		if (free_cluster * parent_dir.dir_file.disk->bpb.BPB_SecPerClus >= disk_size) {
 			// No free clusters

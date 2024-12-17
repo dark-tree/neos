@@ -160,6 +160,7 @@ int scheduler_create_process(int parent_pid, vRef* processFile)
 	{
 		return 1;
 	}
+  
 	uint32_t size = kmsz(image.image);
 	void* stack = image.image + size;
 	stack = isr_stub_stack(stack, image.entry, 2, 1);

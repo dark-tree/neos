@@ -201,7 +201,7 @@ load:
 		mov ax, err_load
 		jc fault
 
-	cmp si, 127
+	cmp si, 200
 	jnz load_next
 
 	call printn

@@ -15,6 +15,3 @@ Generate image and run the file browser.
 ```bash
 make all
 ```   
-
-### Requirements
-`mtools` - required to load files to the floppy disk image.
