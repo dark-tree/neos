@@ -13,9 +13,70 @@ global kset
 global kfree
 global krealloc
 global kmres
+global kmsz
+
+;This function checks the size of an allocated memory area.
+;Takes 1 argument: (void* pointer). Returns an uint32_t - size of the area in bytes. 
+kmsz:
+push EBP
+mov EBP, ESP
+push ESI
+push EDI
+push EBX
+	mov EAX, [EBP+8]
+	sub EAX, [offset]
+	xor EDX, EDX
+	mov EBX, KMALLOC_BLOCK_SIZE
+	div EBX
+	;Converting pointer to block number (by subtracting offset and dividing by block size)
+	;Result in EAX
+
+	mov EDI, EAX
+	xor ESI, ESI
+
+	jmp kms_ptl1_start
+	kms_ptl1:
+		inc ESI
+		shr EDI, 1
+
+	kms_ptl1_start:
+		push EDI ; Element number (segment for level = 0)
+		push ESI ; Tree level
+		call gettreeelement
+		add ESP, 8
+	test EAX, EAX
+	jz kms_ptl1
+	;Searching for the lowest ancestor of the specified tree leaf.
+	;This way we find the size of the allocated area (after executing the loop, the size will be 2^ESI)
+
+	xor ECX, ECX
+	mov EAX, 1
+
+	jmp kms_ptl2_start
+	kms_ptl2:
+		shl EAX, 1
+		add ECX, 1
+	kms_ptl2_start:
+	cmp ECX, ESI
+	jb kms_ptl2
+	;Rasing 2 to the power of ESI, to calculate area size in blocks
+	;Result in EAX
+
+	xor EDX, EDX
+	mul EBX
+	;Converting area size from blocks, to bytes multiplying by block size, previously sotred in EBX)
+
+
+pop EBX
+pop EDI
+pop ESI
+pop EBP
+ret
+
+
 
 ;This function reserves a designated memory area (takes it out of the allocation pool permamently)
-;Takes 2 arguments: (void* pointer, uint32_t size)
+;Takes 2 arguments: (void* pointer, uint32_t size).
 kmres:
 push EBP
 mov EBP, ESP
