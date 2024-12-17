@@ -332,6 +332,31 @@ static int fstat(unsigned int fd, void* statbuf, vStatMapper converter) {
 	return 0;
 }
 
+struct oldold_utsname {
+	char sysname[9];
+	char nodename[9];
+	char release[9];
+	char version[9];
+	char machine[9];
+};
+
+struct old_utsname {
+	char sysname[65];
+	char nodename[65];
+	char release[65];
+	char version[65];
+	char machine[65];
+};
+
+struct new_utsname {
+	char sysname[65];
+	char nodename[65];
+	char release[65];
+	char version[65];
+	char machine[65];
+	char domainname[65];
+};
+
 /* input/output */
 
 static int sys_write(int fd, char* buffer, int bytes) {
@@ -749,6 +774,41 @@ static int sys_chdir(const char* path) {
 
 	return 0;
 
+}
+
+static int sys_getcwd(char* buf, unsigned long size) {
+	ProcessDescriptor process;
+	int caller = scheduler_get_current_pid();
+	scheduler_load_process_info(&process, caller);
+	vfs_trace(&process.cwd, buf, size);
+}
+
+static int sys_getpid() {
+	return scheduler_get_current_pid();
+}
+
+static int sys_uname(struct old_utsname* uname) {
+	strcpy(uname->sysname, "NEOS");
+	strcpy(uname->nodename, "neos");
+	strcpy(uname->release, "0.0.1");
+	strcpy(uname->version, "0.0.1");
+	strcpy(uname->machine, "i386");
+}
+
+static int sys_olduname(struct oldold_utsname* uname) {
+	strcpy(uname->sysname, "NEOS");
+	strcpy(uname->nodename, "neos");
+	strcpy(uname->release, "0.0.1");
+	strcpy(uname->version, "0.0.1");
+	strcpy(uname->machine, "i386");
+}
+
+static int sys_newuname(struct new_utsname* uname) {
+	strcpy(uname->sysname, "NEOS");
+	strcpy(uname->nodename, "neos");
+	strcpy(uname->release, "0.0.1");
+	strcpy(uname->version, "0.0.1");
+	strcpy(uname->machine, "i386");
 }
 
 #define SYSCALL_ENTRY(args, function) {.adapter = syscall_adapter_fn##args, .handler = (void*) (function)}

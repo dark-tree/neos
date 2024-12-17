@@ -34,6 +34,11 @@ spec_impl = [
 	"sys_rmdir",
 	"sys_mkdirat",
 	"sys_chdir",
+	"sys_getcwd",
+	"sys_getpid",
+	"sys_uname",
+	"sys_olduname",
+	"sys_newuname",
 ]
 
 # Add all syscalls implemented in ASM at the interrupt level here
