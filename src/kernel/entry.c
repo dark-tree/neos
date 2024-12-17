@@ -70,7 +70,7 @@ void start() {
 
     vRef root = vfs_root();
     vRef elf;
-    vfs_open(&elf, &root, "/executable/elf", 0);
+    vfs_open(&elf, &root, "/executable/elf-pic", 0);
 
     scheduler_init();
 

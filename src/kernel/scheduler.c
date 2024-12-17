@@ -162,7 +162,7 @@ int scheduler_create_process(int parent_pid, vRef* processFile)
 		return 1;
 	}
 	ProgramImage image;
-    image.prefix = 134512640;
+    image.prefix = 0;
 	image.sufix = INITIAL_STACK_SIZE;
 	int errorCode = elf_load(processFile, &image, true);
 	if(errorCode)

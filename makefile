@@ -68,7 +68,7 @@ $(KERNEL_AS): build/kernel/%.o: src/kernel/%.asm build
 	$(AS) $< -o $@
 
 # Construct the symbol file
-build/kernel.dwarf:
+build/kernel.dwarf: build src/link/kernel.ld $(KERNEL_AS) $(KERNEL_CC)
 	$(LD) -T src/link/debug.ld -o build/kernel.dwarf $(KERNEL_CC) $(KERNEL_AS)
 
 # Compile the kernel to a flat binary
