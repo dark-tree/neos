@@ -59,13 +59,6 @@ void int_wait() {
 	}
 }
 
-extern int int_go_bonkers();
-
-void int_gone_bonkers() {
-	panic("Just a test, panic() called from int_gone_bonkers()");
-	halt();
-}
-
 void int_init() {
 
 	// init the wait subsystem
@@ -82,6 +75,7 @@ void int_init() {
 
 	isr_register(0x80, int_linux_handle); // forward syscalls to the syscall system
 	isr_register(0x20, context_switch);   // stop the timer spam, route timer interrupts to the scheduler
+	isr_register(0x26, NULL);             // stop the floppy spam
 
 	// Point the processor at the IDT and enable interrupts
 	idtr_store(MEMORY_MAP_IDT, 0x81);

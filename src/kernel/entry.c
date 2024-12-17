@@ -39,9 +39,6 @@ void start() {
 	pic_disable();
 	int_init();
 
-  // FIXME move to int_init(), calling it here is INVALID
-	isr_register(0x26, NULL);
-  
 //  kprintf("\e[2J%% Hello \e[1;33m%s\e[m wo%cld, party like it's \e[1m%#0.8x\e[m again!\n", "sweet", 'r', -1920);
 //	kprintf("\e[4B");
 //	kprintf("\e[29C" X S S S X S X X X X S S X X X S S X X X X"\n");

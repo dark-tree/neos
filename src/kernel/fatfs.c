@@ -7,8 +7,8 @@
 #include "memory.h"
 #include "util.h"
 
-//#define FATFS_DEBUG_LOG kprintf
-#define FATFS_DEBUG_LOG
+//#define FATFS_DEBUG_LOG(...) kprintf(__VA_ARGS__);
+#define FATFS_DEBUG_LOG(...)
 
 /* private */
 
@@ -90,7 +90,7 @@ int fatfs_open(vRef* vref, const char* basename, uint32_t flags) {
 			FATFS_DEBUG_LOG("fatfs: fopen success\n");
 			return 0;
 		}
-		// TODO: report EEXIST if the file exists 
+		// TODO: report EEXIST if the file exists
 	}
 
 	return -LINUX_EIO;
@@ -169,7 +169,6 @@ int fatfs_list(vRef* vref, vEntry* entries, int max) {
 	if (state->is_dir) {
 		fat_DIR* dir = &state->dir;
 		fat_rewinddir(dir);
-		int i = 0;
 		fat_DIR* dir_entry;
 		fat_FILE* file_entry;
 		for (int i = 0; i < max; i++) {
@@ -256,6 +255,19 @@ int fatfs_stat(vRef* vref, vStat* stat) {
 int fatfs_readlink(vRef* vref, const char* name, char* buffer, int size) {
 	FATFS_DEBUG_LOG("fatfs: readlink\n");
 	return fatfs_read(vref, buffer, size);
+}
+
+int fatf_lookup(vRef* vref, char* name) {
+	FATFS_DEBUG_LOG("fatfs: lookup\n");
+	state_data* state = vref->state;
+
+	// TODO: check if root, then return -1
+	if (state->is_dir && false) {
+		return -1;
+	}
+
+	strcpy(name, state->file.long_filename);
+	return 0;
 }
 
 /* public */

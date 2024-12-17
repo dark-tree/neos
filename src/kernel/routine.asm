@@ -15,12 +15,10 @@ extern pic_accept
 
 ; See interrupt.c
 extern int_common_handle
-extern int_gone_bonkers
 
 global isr_name
 global isr_register
 global isr_init
-global int_go_bonkers
 global isr_stub_stack
 global isr_into_stack
 
@@ -170,19 +168,6 @@ isr_tail:
 	add esp, 8
 
 	iret
-
-
-int_go_bonkers:
-
-	push dword 1
-	push dword 2
-	push dword int_gone_bonkers
-	push dword service_table
-	call isr_stub_stack
-	add esp, 4*4
-
-	push eax
-	call isr_into_stack
 
 
 isr_into_stack:

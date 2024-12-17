@@ -781,6 +781,7 @@ static int sys_getcwd(char* buf, unsigned long size) {
 	int caller = scheduler_get_current_pid();
 	scheduler_load_process_info(&process, caller);
 	vfs_trace(&process.cwd, buf, size);
+	return (int) buf;
 }
 
 static int sys_getpid() {
@@ -793,6 +794,7 @@ static int sys_uname(struct old_utsname* uname) {
 	strcpy(uname->release, "0.0.1");
 	strcpy(uname->version, "0.0.1");
 	strcpy(uname->machine, "i386");
+	return 0;
 }
 
 static int sys_olduname(struct oldold_utsname* uname) {
@@ -801,6 +803,7 @@ static int sys_olduname(struct oldold_utsname* uname) {
 	strcpy(uname->release, "0.0.1");
 	strcpy(uname->version, "0.0.1");
 	strcpy(uname->machine, "i386");
+	return 0;
 }
 
 static int sys_newuname(struct new_utsname* uname) {
@@ -809,6 +812,7 @@ static int sys_newuname(struct new_utsname* uname) {
 	strcpy(uname->release, "0.0.1");
 	strcpy(uname->version, "0.0.1");
 	strcpy(uname->machine, "i386");
+	return 0;
 }
 
 #define SYSCALL_ENTRY(args, function) {.adapter = syscall_adapter_fn##args, .handler = (void*) (function)}
