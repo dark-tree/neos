@@ -110,11 +110,11 @@ clean:
 # Invoke QEMU wihtout waiting for GDB
 run: build/final.iso disks/floppy.img
 	rm -f ./output
-	qemu-system-i386 -monitor stdio -cdrom ./build/final.iso -boot a -drive file=./disks/floppy.img,if=floppy,index=1,format=raw -d cpu_reset -D ./output
+	qemu-system-i386 -m 2G -monitor stdio -cdrom ./build/final.iso -boot a -drive file=./disks/floppy.img,if=floppy,index=1,format=raw -d cpu_reset -D ./output
 
 # Invoke QEMU and wait for GDB
 debug: build/final.iso build/kernel.dwarf disks/floppy.img
-	qemu-system-i386 -cdrom ./build/final.iso -boot a -s -S -drive file=./disks/floppy.img,if=floppy,index=1,format=raw &
+	qemu-system-i386 -m 2G -cdrom ./build/final.iso -boot a -s -S -drive file=./disks/floppy.img,if=floppy,index=1,format=raw &
 	gdb -ex 'target remote localhost:1234' -ex 'symbol-file build/kernel.dwarf' -ex 'break *0x8000' -ex 'c'
 
 disasm: build/bootloader.bin

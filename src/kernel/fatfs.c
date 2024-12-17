@@ -258,16 +258,16 @@ int fatfs_readlink(vRef* vref, const char* name, char* buffer, int size) {
 }
 
 int fatf_lookup(vRef* vref, char* name) {
-	FATFS_DEBUG_LOG("fatfs: lookup\n");
-	state_data* state = vref->state;
+    FATFS_DEBUG_LOG("fatfs: lookup\n");
+    state_data* state = vref->state;
 
-	// TODO: check if root, then return -1
-	if (state->is_dir && false) {
-		return -1;
-	}
+    // check if root, then return -1
+    if (state->is_dir && (state->dir.dir_file.fat_dir.DIR_FstClusLO <= 2)) {
+        return -1;
+    }
 
-	strcpy(name, state->file.long_filename);
-	return 0;
+    fat_longname_to_string(state->file.long_filename, name);
+    return 0;
 }
 
 /* public */
