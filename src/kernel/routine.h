@@ -39,7 +39,7 @@ extern void isr_register(int interrupt, interrupt_hander handler);
 extern const char* isr_name(int interrupt);
 
 
-extern void* isr_stub_stack(void* stack, void* eip, uint32_t data_gdt_index, uint32_t code_gdt_index);
+extern void* isr_stub_stack(void* stack, void* eip, uint32_t data_gdt_index, uint32_t code_gdt_index, int virtual_offset);
 
 
 extern void isr_into_stack(void* stack);

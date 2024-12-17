@@ -92,6 +92,6 @@ void gad(int i, uint32_t offset, uint32_t size)
      code = code | mask;
      data = data | mask;
 
-     gdt[i] = code;
-     gdt[i+1] = data;
+     gdt[i] = 0x0000FFFF00CF9B00;//code;
+     gdt[i+1] = 0x0000FFFF00CF9300;//data;
 }

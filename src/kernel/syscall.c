@@ -361,6 +361,12 @@ struct new_utsname {
 
 static int sys_write(int fd, char* buffer, int bytes) {
 
+//	if (fd == 0 || fd == 1 || fd == 2) {
+//		for (int i = 0; i < bytes; i ++) {
+//			con_write(buffer[i]);
+//		}
+//	}
+
 	vRef* vref = fd_resolve(fd);
 
 	if (!vref) {
