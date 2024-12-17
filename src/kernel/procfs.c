@@ -230,12 +230,16 @@ int procfs_read(vRef* vref, void* buffer, uint32_t size) {
 	ProcState* state = vref->state;
 
 	if (state->node == PROC_LEAF_CWD) {
-		// TODO: trace cwd path
+		ProcessDescriptor process;
+		scheduler_load_process_info(&process, state->pid);
+		vfs_trace(&process.cwd, buffer, size);
 		return 0;
 	}
 
 	if (state->node == PROC_LEAF_EXE) {
-		// TODO: trace exe path
+		ProcessDescriptor process;
+		scheduler_load_process_info(&process, state->pid);
+		vfs_trace(&process.exe, buffer, size);
 		return 0;
 	}
 
@@ -436,8 +440,7 @@ int procfs_readlink(vRef* vref, const char* name, char* buffer, int size) {
 	if (state->node == PROC_NODE_PROC && streq(name, "exe")) {
 		ProcessDescriptor process;
 		scheduler_load_process_info(&process, state->pid);
-
-		// TODO: trace exe path
+		vfs_trace(&process.exe, buffer, size);
 		return 0;
 	}
 
