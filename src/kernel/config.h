@@ -64,3 +64,15 @@
  *        this does not concern processes created using fork.
  */
 #define INITIAL_STACK_SIZE 1024*32
+
+/**
+ * @brief Maximum number of processes in the system.
+ *
+ */
+#define MAX_PROCESS_COUNT 1023
+
+/**
+ * @brief Fixed size of the GDT
+ *
+ */
+#define GDT_SIZE 2*(1+MAX_PROCESS_COUNT)

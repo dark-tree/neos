@@ -18,6 +18,8 @@
 #include "fat.h"
 #include "rivendell.h"
 
+#include "gdt.h"
+
 void start() __attribute__((section(".text.start")));
 
 extern char asm_test();
@@ -36,6 +38,9 @@ void start() {
 
 	// Init memory system and make room for the kernel
 	mem_init(0xFFFFF + 1 /* TODO: remove when fix is merged */);
+
+    ginit();
+
 	pic_disable();
 	int_init();
 
@@ -61,7 +66,7 @@ void start() {
 
 	kprintf("System ready!\n");
 
-	scheduler_init();
+    scheduler_init();
 
 	// never return to the bootloader
 	halt();

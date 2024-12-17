@@ -18,8 +18,9 @@ typedef struct {
 	bool* fileExists;
 	vRef cwd;
 	vRef exe;
+    uint32_t mount;
+    int processSegmentsIndex;
 } ProcessDescriptor;
-
 
 extern int scheduler_get_current_pid();
 

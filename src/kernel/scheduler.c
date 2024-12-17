@@ -5,6 +5,9 @@
 #include "print.h"
 #include "scheduler.h"
 #include "rivendell.h"
+#include "tables.h"
+
+
 
 ProcessDescriptor* general_process_table;
 int process_count;
@@ -51,6 +54,7 @@ int scheduler_load_process_info(ProcessDescriptor* processInfo, int pid)
 	processInfo->fileExists = process->fileExists;
 	processInfo->cwd = process->cwd;
 	processInfo->exe = process->exe;
+    processInfo->mount = process->mount;
 	return 0;
 }
 
@@ -83,13 +87,12 @@ int get_index(int i)
 
 void scheduler_init()
 {
-	process_running = (-1);
-	general_process_table = (ProcessDescriptor*)kmalloc(sizeof(ProcessDescriptor)*process_table_size);
-
+    process_running = (-1);
+    general_process_table = (ProcessDescriptor*)kmalloc(sizeof(ProcessDescriptor)*process_table_size);
 }
 
 
-void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vRef* exe)
+void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vRef* exe, uint32_t mount)
 {
 	int index = 0;
 	while(index!=process_count && general_process_table[index].exists!=false)
@@ -113,6 +116,7 @@ void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vR
 	new_entry->files = kmalloc(sizeof(vRef)*MAX_FILES_PER_PROCESS);
 	new_entry->fileExists = kmalloc(sizeof(bool)*MAX_FILES_PER_PROCESS);
 	new_entry->exe = *exe;
+    new_entry->mount = mount;
 
 	// TODO set this to some better value
 	new_entry->cwd = vfs_root();
@@ -160,11 +164,13 @@ int scheduler_create_process(int parent_pid, vRef* processFile)
 	{
 		return 1;
 	}
-  
 	uint32_t size = kmsz(image.image);
 	void* stack = image.image + size;
 	stack = isr_stub_stack(stack, image.entry, 2, 1);
-	scheduler_new_entry(parent_pid, stack, image.image, processFile);
+    int virtualStack = ((stack - image.image) - image.prefix)+image.mount;
+    int dataSegmentIndex;
+    int codeSegmentIndex;
+    scheduler_new_entry(parent_pid, virtualStack, image.image, processFile, image.mount);
 	return 0;
 }
 
