@@ -287,7 +287,9 @@ static void vstat_to_linux_64(struct stat64* lstat, vStat* vstat) {
 
 }
 
-static int stat(const char* filename, void* statbuf, void (*converter) (void* dst, vStat* src), int flags) {
+typedef void (*vStatMapper) (void* dst, vStat* src);
+
+static int stat(const char* filename, void* statbuf, vStatMapper converter, int flags) {
 
 	vRef cwd = fd_cwd();
 	vRef vref;
@@ -312,7 +314,7 @@ static int stat(const char* filename, void* statbuf, void (*converter) (void* ds
 
 }
 
-static int fstat(unsigned int fd, void* statbuf, void (*converter) (void* dst, vStat* src)) {
+static int fstat(unsigned int fd, void* statbuf, vStatMapper converter) {
 
 	vRef* vref = fd_resolve(fd);
 	vStat stat;
@@ -329,6 +331,31 @@ static int fstat(unsigned int fd, void* statbuf, void (*converter) (void* dst, v
 	converter(statbuf, &stat);
 	return 0;
 }
+
+struct oldold_utsname {
+	char sysname[9];
+	char nodename[9];
+	char release[9];
+	char version[9];
+	char machine[9];
+};
+
+struct old_utsname {
+	char sysname[65];
+	char nodename[65];
+	char release[65];
+	char version[65];
+	char machine[65];
+};
+
+struct new_utsname {
+	char sysname[65];
+	char nodename[65];
+	char release[65];
+	char version[65];
+	char machine[65];
+	char domainname[65];
+};
 
 /* input/output */
 
@@ -602,39 +629,39 @@ static int sys_old_readdir(unsigned int fd, struct old_linux_dirent* buffer, uns
 }
 
 static int sys_stat(const char* filename, struct __old_kernel_stat* statbuf) {
-	return stat(filename, statbuf, (void(*)(void*, vStat*))vstat_to_linux_old, /* Do follow links */ 0);
+	return stat(filename, statbuf, (vStatMapper) vstat_to_linux_old, /* Do follow links */ 0);
 }
 
 static int sys_fstat(unsigned int fd, struct __old_kernel_stat* statbuf) {
-	return fstat(fd, statbuf, (void(*)(void*, vStat*))vstat_to_linux_old);
+	return fstat(fd, statbuf, (vStatMapper) vstat_to_linux_old);
 }
 
 static int sys_lstat(const char* filename, struct __old_kernel_stat* statbuf) {
-	return stat(filename, statbuf, (void(*)(void*, vStat*))vstat_to_linux_old, OPEN_NOFOLLOW);
+	return stat(filename, statbuf, (vStatMapper) vstat_to_linux_old, OPEN_NOFOLLOW);
 }
 
 static int sys_newstat(const char* filename, struct stat* statbuf) {
-	return stat(filename, statbuf, (void(*)(void*, vStat*))vstat_to_linux_32, /* Do follow links */ 0);
+	return stat(filename, statbuf, (vStatMapper) vstat_to_linux_32, /* Do follow links */ 0);
 }
 
 static int sys_newlstat(const char* filename, struct stat* statbuf) {
-	return stat(filename, statbuf, (void(*)(void*, vStat*))vstat_to_linux_32, OPEN_NOFOLLOW);
+	return stat(filename, statbuf, (vStatMapper) vstat_to_linux_32, OPEN_NOFOLLOW);
 }
 
 static int sys_newfstat(unsigned int fd, struct stat* statbuf) {
-	return fstat(fd, statbuf, (void(*)(void*, vStat*))vstat_to_linux_32);
+	return fstat(fd, statbuf, (vStatMapper) vstat_to_linux_32);
 }
 
 static int sys_stat64(const char* filename, struct stat64* statbuf) {
-	return stat(filename, statbuf, (void(*)(void*, vStat*))vstat_to_linux_64, /* Do follow links */ 0);
+	return stat(filename, statbuf, (vStatMapper) vstat_to_linux_64, /* Do follow links */ 0);
 }
 
 static int sys_lstat64(const char* filename, struct stat64* statbuf) {
-	return stat(filename, statbuf, (void(*)(void*, vStat*))vstat_to_linux_64, OPEN_NOFOLLOW);
+	return stat(filename, statbuf, (vStatMapper) vstat_to_linux_64, OPEN_NOFOLLOW);
 }
 
 static int sys_fstat64(unsigned long fd, struct stat64* statbuf) {
-	return fstat(fd, statbuf, (void(*)(void*, vStat*))vstat_to_linux_64);
+	return fstat(fd, statbuf, (vStatMapper) vstat_to_linux_64);
 }
 
 static int sys_close(unsigned int fd) {
@@ -747,6 +774,41 @@ static int sys_chdir(const char* path) {
 
 	return 0;
 
+}
+
+static int sys_getcwd(char* buf, unsigned long size) {
+	ProcessDescriptor process;
+	int caller = scheduler_get_current_pid();
+	scheduler_load_process_info(&process, caller);
+	vfs_trace(&process.cwd, buf, size);
+}
+
+static int sys_getpid() {
+	return scheduler_get_current_pid();
+}
+
+static int sys_uname(struct old_utsname* uname) {
+	strcpy(uname->sysname, "NEOS");
+	strcpy(uname->nodename, "neos");
+	strcpy(uname->release, "0.0.1");
+	strcpy(uname->version, "0.0.1");
+	strcpy(uname->machine, "i386");
+}
+
+static int sys_olduname(struct oldold_utsname* uname) {
+	strcpy(uname->sysname, "NEOS");
+	strcpy(uname->nodename, "neos");
+	strcpy(uname->release, "0.0.1");
+	strcpy(uname->version, "0.0.1");
+	strcpy(uname->machine, "i386");
+}
+
+static int sys_newuname(struct new_utsname* uname) {
+	strcpy(uname->sysname, "NEOS");
+	strcpy(uname->nodename, "neos");
+	strcpy(uname->release, "0.0.1");
+	strcpy(uname->version, "0.0.1");
+	strcpy(uname->machine, "i386");
 }
 
 #define SYSCALL_ENTRY(args, function) {.adapter = syscall_adapter_fn##args, .handler = (void*) (function)}

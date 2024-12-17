@@ -79,3 +79,9 @@ int streq(const char* lcstr, const char* rcstr) {
 
 	return true;
 }
+
+int strcpy(char* buffer, const char* cstr) {
+	int length = strlen(cstr);
+	memcpy(buffer, cstr, length);
+	return length;
+}

@@ -55,6 +55,12 @@
 
 /**
  * @brief The maximum number of segments (slash separated sections) in a path,
- *        including the resolves used suring link traversal.
+ *        including the resolves used during link traversal.
  */
 #define PATH_MAX_RESOLVES 64
+
+/**
+ * @brief The size of stack allocated by default to a new process,
+ *        this does not concern processes created using fork.
+ */
+#define INITIAL_STACK_SIZE 1024*32

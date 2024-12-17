@@ -18,7 +18,7 @@ spec_impl = [
 	"sys_readlink",
 	"sys_getdents64",
 	"sys_getdents",
-	"sys_old_readdir"
+	"sys_old_readdir",
 	"sys_stat",
 	"sys_fstat",
 	"sys_lstat",
@@ -32,7 +32,13 @@ spec_impl = [
 	"sys_unlink",
 	"sys_unlinkat",
 	"sys_rmdir",
-	"sys_mkdirat"
+	"sys_mkdirat",
+	"sys_chdir",
+	"sys_getcwd",
+	"sys_getpid",
+	"sys_uname",
+	"sys_olduname",
+	"sys_newuname",
 ]
 
 # Add all syscalls implemented in ASM at the interrupt level here

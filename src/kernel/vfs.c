@@ -189,8 +189,10 @@ int vfs_open(vRef* vref, vRef* relation, const char* path, uint32_t flags) {
 	// absolute path
 	if (path[0] == '/') {
 		vfs_refcpy(vref, &vfs_root_ref);
+		vfs_update(vref);
 	} else {
 		vfs_refcpy(vref, relation);
+		vfs_update(vref);
 	}
 
 	while (vfs_resolve(&vpth, front)) {
@@ -308,6 +310,65 @@ int vfs_readlink(vRef* vref, const char* name, char* buffer, int size) {
 
 	// TODO No driver at leaf node, return error?
 	return 0;
+}
+
+void vfs_trace(vRef* vref, char* output, int size) {
+
+	char* path[PATH_MAX_RESOLVES];
+	int last = PATH_MAX_RESOLVES - 1;
+
+	for (int i = 0; i < last; i ++) {
+		path[i] = NULL;
+	}
+
+	// copy ref so we don't change anything while tracing
+	vRef copy;
+	vfs_refcpy(&copy, vref);
+	vfs_update(&copy);
+
+	int j = last;
+
+	while (j >= 0) {
+
+		if ((copy.node == &vfs_root_node) && (copy.offset == 0)) {
+			break;
+		}
+
+		char* buffer = kmalloc(FILE_MAX_NAME);
+
+		if (!copy.driver || copy.driver->lookup(&copy, buffer)) {
+			memcpy(buffer, copy.node->name, strlen(copy.node->name) + 1);
+		}
+
+		vfs_enter(&copy, "..", 0);
+		path[j --] = buffer;
+
+	}
+
+	int k = 1;
+	j ++;
+	output[0] = '/';
+
+	while (j < PATH_MAX_RESOLVES) {
+
+		char* name = path[j ++];
+		int length = strlen(name);
+
+		if ((k + length) >= size) {
+			break;
+		}
+
+		memcpy(output + k, name, length);
+		kfree(name);
+
+		k += length;
+		output[k ++] = '/';
+
+	}
+
+	output[k] = 0;
+	vfs_close(&copy);
+
 }
 
 int vfs_resolve(vPath* path, char* buffer) {
