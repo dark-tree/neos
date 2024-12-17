@@ -15,7 +15,6 @@
 
 void start() __attribute__((section(".text.start")));
 
-
 extern char asm_test();
 extern void pic_disable();
 

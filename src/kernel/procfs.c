@@ -4,6 +4,7 @@
 #include "print.h"
 #include "memory.h"
 #include "scheduler.h"
+#include "math.h"
 
 /* private */
 
@@ -249,6 +250,12 @@ int procfs_read(vRef* vref, void* buffer, uint32_t size) {
 
 int procfs_write(vRef* vref, void* buffer, uint32_t size) {
 	kprintf("procfs: write %d\n", size);
+
+	// ignore arguments
+	(void) vref;
+	(void) buffer;
+	(void) size;
+
 	return -LINUX_EROFS; // never allow writing to ProcFS
 }
 
@@ -354,11 +361,21 @@ int procfs_list(vRef* vref, vEntry* buffer, int max) {
 
 int procfs_mkdir(vRef* vref, const char* name) {
 	kprintf("procfs: mkdir %s\n", name);
+
+	// ignore arguments
+	(void) vref;
+	(void) name;
+
 	return -LINUX_EROFS; // never allow writing to ProcFS
 }
 
 int procfs_remove(vRef* vref, bool rmdir) {
 	kprintf("procfs: remove\n");
+
+	// ignore arguments
+	(void) vref;
+	(void) rmdir;
+
 	return -LINUX_EROFS; // never allow writing to ProcFS
 }
 

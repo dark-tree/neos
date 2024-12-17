@@ -14,20 +14,18 @@ int process_running;
 
 bool scheduler_pid_invalid(int pid)
 {
-    if (pid<=0)
-    {
-        return true;
-    }
-    pid--;
-    if (pid>=process_count)
-    {
-        return true;
-    }
-    if(general_process_table[pid].exists = false)
-    {
-        return true;
-    }
-    return false;
+	if (pid<=0)
+	{
+		return true;
+	}
+
+	pid--;
+	if (pid>=process_count)
+	{
+		return true;
+	}
+
+	return !general_process_table[pid].exists;
 }
 
 int scheduler_get_current_pid()
@@ -37,7 +35,7 @@ int scheduler_get_current_pid()
 
 int scheduler_load_process_info(ProcessDescriptor* processInfo, int pid)
 {
-    if(scheduler_pid_invalid(pid))
+	if(scheduler_pid_invalid(pid))
 	{
 		return 1;
 	}
@@ -52,7 +50,7 @@ int scheduler_load_process_info(ProcessDescriptor* processInfo, int pid)
 	processInfo->files = process->files;
 	processInfo->fileExists = process->fileExists;
 	processInfo->cwd = process->cwd;
-    processInfo->exe = process->exe;
+	processInfo->exe = process->exe;
 	return 0;
 }
 
@@ -114,7 +112,7 @@ void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vR
 	new_entry->process_memory = process_memory;
 	new_entry->files = kmalloc(sizeof(vRef)*MAX_FILES_PER_PROCESS);
 	new_entry->fileExists = kmalloc(sizeof(bool)*MAX_FILES_PER_PROCESS);
-    new_entry->exe = *exe;
+	new_entry->exe = *exe;
 
 	// TODO set this to some better value
 	new_entry->cwd = vfs_root();
@@ -128,53 +126,54 @@ void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vR
 
 void scheduler_remove_entry(int index)
 {
-    ProcessDescriptor* process = general_process_table+index;
-    process->exists=false;
-    kfree(process->files);
-    kfree(process->fileExists);
+	ProcessDescriptor* process = general_process_table+index;
+	process->exists=false;
+	kfree(process->files);
+	kfree(process->fileExists);
 }
 
 int scheduler_kill_process(int pid)
 {
-    if(scheduler_pid_invalid(pid))
+	if(scheduler_pid_invalid(pid))
 	{
 		return 1;
 	}
 	pid--;
 	ProcessDescriptor* process = general_process_table+pid;
-    kfree(general_process_table[pid].process_memory);
-    vfs_close(&process->cwd);
-    scheduler_remove_entry(pid);
+	kfree(general_process_table[pid].process_memory);
+	vfs_close(&process->cwd);
+	scheduler_remove_entry(pid);
 	return 0;
 }
 
 int scheduler_create_process(int parent_pid, vRef* processFile)
 {
-    if(parent_pid!=(-1) && scheduler_pid_invalid(parent_pid))
+	if(parent_pid!=(-1) && scheduler_pid_invalid(parent_pid))
 	{
 		return 1;
 	}
-    ProgramImage image;
-    image.prefix = 0;
-    image.sufix = INITIAL_STACK_SIZE;
-    int errorCode = elf_load(processFile, &image, true);
-    if(errorCode)
-    {
-        return 1;
-    }
-    uint32_t size = kmsz(image.image);
-    void* stack = image.image + size;
-    stack = isr_stub_stack(stack, image.entry, 2, 1);
-    scheduler_new_entry(parent_pid, stack, image.image, processFile);
+	ProgramImage image;
+	image.prefix = 0;
+	image.sufix = INITIAL_STACK_SIZE;
+	int errorCode = elf_load(processFile, &image, true);
+	if(errorCode)
+	{
+		return 1;
+	}
+	uint32_t size = kmsz(image.image);
+	void* stack = image.image + size;
+	stack = isr_stub_stack(stack, image.entry, 2, 1);
+	scheduler_new_entry(parent_pid, stack, image.image, processFile);
 	return 0;
 }
 
 int scheduler_context_switch(void* old_stack)
 {
-	if(0==0)
+	if(process_count==0)
 	{
-		return old_stack;
+		return (int) old_stack;
 	}
+
 	general_process_table[process_running].stack = old_stack;
 	process_running++;
 	while(general_process_table[process_running].exists==false)
@@ -185,82 +184,78 @@ int scheduler_context_switch(void* old_stack)
 	{
 		process_running=0;
 	}
-	return (int)general_process_table[process_running].stack;
+	return (int) general_process_table[process_running].stack;
 }
 
 int scheduler_chdir(int pid, vRef* cwd) {
-    if(scheduler_pid_invalid(pid))
-    {
-        return 1;
-    }
-    general_process_table[pid-1].cwd = *cwd;
-    return 0;
+	if(scheduler_pid_invalid(pid))
+	{
+		return 1;
+	}
+	general_process_table[pid-1].cwd = *cwd;
+	return 0;
 }
 
 int scheduler_fput(int pid, vRef vref)
 {
-    if(scheduler_pid_invalid(pid))
+	if(scheduler_pid_invalid(pid))
 	{
 		return 0;
 	}
 	int index = pid-1;
-    for(int i = 0; i<MAX_FILES_PER_PROCESS; i++)
-    {
-        if(!general_process_table[index].fileExists[i])
-        {
-            general_process_table[index].files[i]=vref;
-            general_process_table[index].fileExists[i] = true;
-            return i+1;
-        }
-    }
+	for(int i = 0; i<MAX_FILES_PER_PROCESS; i++)
+	{
+		if(!general_process_table[index].fileExists[i])
+		{
+			general_process_table[index].files[i]=vref;
+			general_process_table[index].fileExists[i] = true;
+			return i+1;
+		}
+	}
 
 	return 0;
 }
 
 vRef* scheduler_fget(int pid, int fd)
 {
-    if(scheduler_pid_invalid(pid))
+	if(scheduler_pid_invalid(pid))
 	{
 		return NULL;
 	}
 	int index = pid-1;
 
-    fd = fd-1;
-    if(fd<0 || fd >=MAX_FILES_PER_PROCESS)
-    {
-        return NULL;
-    }
-    if(!general_process_table[index].fileExists[fd])
-    {
-        return NULL;
-    }
-    return general_process_table[index].files + fd;
+	fd = fd-1;
+	if(fd<0 || fd >=MAX_FILES_PER_PROCESS)
+	{
+		return NULL;
+	}
+	if(!general_process_table[index].fileExists[fd])
+	{
+		return NULL;
+	}
+	return general_process_table[index].files + fd;
 
 	return NULL;
 }
 
 int scheduler_fremove(int pid, int fd)
 {
-    if(scheduler_pid_invalid(pid))
+	if(scheduler_pid_invalid(pid))
 	{
 		return 1;
 	}
 	int index = pid-1;
-    fd = fd-1;
-    if(fd<0 || fd >=MAX_FILES_PER_PROCESS)
-    {
-        return 1;
-    }
-    if(!general_process_table[index].fileExists[fd])
-    {
-        return 1;
-    }
-    general_process_table[index].fileExists = false;
-    return 0;
+	fd = fd-1;
+	if(fd<0 || fd >=MAX_FILES_PER_PROCESS)
+	{
+		return 1;
+	}
+	if(!general_process_table[index].fileExists[fd])
+	{
+		return 1;
+	}
+	general_process_table[index].fileExists = false;
+	return 0;
 
 	return 1;
 }
-
-
-
-

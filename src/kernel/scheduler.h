@@ -2,22 +2,22 @@
 #include "vfs.h"
 
 typedef enum {
-    RUNNABLE,
-    SLEEPING,
-    STOPPED,
-    ZOMBIE
+	RUNNABLE,
+	SLEEPING,
+	STOPPED,
+	ZOMBIE
 } ProcessState;
 
 typedef struct {
-    bool exists;
-    void* stack;
-    void* process_memory;
-    ProcessState state;
-    int parent_index;
-    vRef* files;
-    bool* fileExists;
-    vRef cwd;
-    vRef exe;
+	bool exists;
+	void* stack;
+	void* process_memory;
+	ProcessState state;
+	int parent_index;
+	vRef* files;
+	bool* fileExists;
+	vRef cwd;
+	vRef exe;
 } ProcessDescriptor;
 
 

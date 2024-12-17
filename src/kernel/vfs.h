@@ -281,7 +281,7 @@ typedef int (*driver_stat) (vRef* vref, vStat* stat);
  *         LINUX_EINVAL  - Given file exists but is not a link
  *         LINUX_ENOENT  - No such link exists
  */
-typedef int (*driver_readlink) (vRef* vref, const char* name, const char* buffer, int size);
+typedef int (*driver_readlink) (vRef* vref, const char* name, char* buffer, int size);
 
 /**
  * @brief Get the name of node in a filesystem
@@ -376,7 +376,7 @@ int vfs_stat(vRef* vref, vStat* stat);
 /**
  * @brief Perform a filesystem-independent file readlink() operation
  */
-int vfs_readlink(vRef* vref, const char* name, const char* buffer, int size);
+int vfs_readlink(vRef* vref, const char* name, char* buffer, int size);
 
 /*
  * @brief convert vRef into an absolute string path

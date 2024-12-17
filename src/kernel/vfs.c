@@ -303,7 +303,7 @@ int vfs_stat(vRef* vref, vStat* stat) {
 	return 0;
 }
 
-int vfs_readlink(vRef* vref, const char* name, const char* buffer, int size) {
+int vfs_readlink(vRef* vref, const char* name, char* buffer, int size) {
 	if (vref->driver) {
 		return vref->driver->readlink(vref, name, buffer, size);
 	}
@@ -353,6 +353,11 @@ void vfs_trace(vRef* vref, char* output, int size) {
 
 		char* name = path[j ++];
 		int length = strlen(name);
+
+		if ((k + length) >= size) {
+			break;
+		}
+
 		memcpy(output + k, name, length);
 		kfree(name);
 
