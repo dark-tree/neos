@@ -157,6 +157,9 @@ int scheduler_kill_process(int pid)
 
 int scheduler_create_process(int parent_pid, vRef* processFile)
 {
+
+	__asm volatile ("cli");
+
 	if(parent_pid!=(-1) && scheduler_pid_invalid(parent_pid))
 	{
 		return 1;
@@ -165,16 +168,32 @@ int scheduler_create_process(int parent_pid, vRef* processFile)
     image.prefix = 0;
 	image.sufix = INITIAL_STACK_SIZE;
 	int errorCode = elf_load(processFile, &image, true);
+
+	image.entry -= image.mount;
+	image.mount = 0; // FIXME
+
 	if(errorCode)
 	{
 		return 1;
 	}
+
+	// Size of the entire process memory
 	uint32_t size = kmsz(image.image);
+
+	// Pointer to the top of the physical stack (end of memory block)
 	void* stack = image.image + size;
-    int virtualStack = ((stack - image.image) - image.prefix)+image.mount;
-    int processSegmentIndex = gput(image.image, size);
-    stack = isr_stub_stack(stack, image.entry, processSegmentIndex+1, processSegmentIndex);
-    scheduler_new_entry(parent_pid, virtualStack, image.image, processFile, image.mount, processSegmentIndex);
+
+	uint32_t entrypoint = image.image + image.entry + image.prefix;
+	int segment = 1;// gput(0, 0xFFFFFFFF);
+
+	stack = isr_stub_stack(stack, entrypoint, segment + 1, segment, 0);
+
+	scheduler_new_entry(parent_pid, stack, image.image, processFile, image.mount, segment);
+
+	kprintf("New process at: %0.8x, entry: %0.8x\n", image.image, entrypoint);
+
+	__asm volatile ("sti");
+
 	return 0;
 }
 
@@ -185,8 +204,14 @@ int scheduler_context_switch(void* old_stack)
 		return (int) old_stack;
 	}
 
+//	kprintf("context switch:\n");
+//	kprintf(" * stack: %d\n", general_process_table[process_running].stack);
+//	kprintf(" * from: %d\n", process_running);
+//	kprintf(" * old_stack: %d\n", old_stack);
+
 	general_process_table[process_running].stack = old_stack;
 	process_running++;
+
 	while(general_process_table[process_running].exists==false)
 	{
 		process_running++;
@@ -195,6 +220,10 @@ int scheduler_context_switch(void* old_stack)
 	{
 		process_running=0;
 	}
+
+//	kprintf(" * to: %d\n", process_running);
+//	kprintf(" * stack: %d\n", general_process_table[process_running].stack);
+
 	return (int) general_process_table[process_running].stack;
 }
 

@@ -22,7 +22,8 @@ static void int_debug_handle(int number, int error, int* eax, int ecx, int edx, 
 	kprintf(" * EAX=%#x, EBX=%#x\n", *eax, ebx);
 	kprintf(" * ECX=%#x, EDX=%#x\n", ecx, edx);
 	kprintf(" * ESI=%#x, EDI=%#x\n", esi, edi);
-    halt();
+
+	panic("Unregistered interrupt!");
 }
 
 // Forward syscalls to the syscall system

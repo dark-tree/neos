@@ -84,7 +84,7 @@ int fatfs_open(vRef* vref, const char* basename, uint32_t flags) {
 		// TODO: report ENOTDIR if the file is not a directory and open failed
 	}
 	else {
-		const char* mode = (flags & OPEN_APPEND) ? "a" : (flags & OPEN_CREAT) ? "w" : "r";
+		const char* mode = (flags & OPEN_APPEND) ? "a" : ((flags & OPEN_CREAT) ? "w" : "r");
 		if (fat_fopen(&state->file, &parent_dir, basename, mode)) {
 			state->is_dir = false;
 			FATFS_DEBUG_LOG("fatfs: fopen success\n");

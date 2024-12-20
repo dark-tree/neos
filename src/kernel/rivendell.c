@@ -137,7 +137,7 @@ static int elf_segcpy(vRef* vref, void* image, uint32_t mount, ImageSegment* seg
 		return ELF_READ_ERROR;
 	}
 
-	memset(image + address, 0, segment->mem_size);
+	memset(image + address, 0, padding);
 	return ELF_SUCCESS;
 }
 

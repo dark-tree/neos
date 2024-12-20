@@ -15,14 +15,14 @@
  * @brief driver open flags
  * @note taken from glibc
  */
-#define OPEN_WRONLY    0x000001 /* Open in write-only mode */
-#define OPEN_RDWR      0x000002 /* Open in read-write mode */
-#define OPEN_APPEND    0x000008 /* Open in append mode */
-#define OPEN_CREAT     0x000200 /* Create if missing */
-#define OPEN_EXCL      0x000800 /* Require creation, fail if present */
-#define OPEN_DIRECTORY 0x200000 /* Require target file to be a directory */
-#define OPEN_NOFOLLOW  0x000100 /* Don't follow links in path */
-#define OPEN_TRUNC     0x000200 /* Clear (truncate) the file */
+#define OPEN_WRONLY    0x00001 /* Open in write-only mode */
+#define OPEN_RDWR      0x00002 /* Open in read-write mode */
+#define OPEN_APPEND    0x00400 /* Open in append mode */
+#define OPEN_CREAT     0x00040 /* Create if missing */
+#define OPEN_EXCL      0x00080 /* Require creation, fail if present */
+#define OPEN_DIRECTORY 0x10000 /* Require target file to be a directory */
+#define OPEN_NOFOLLOW  0x20000 /* Don't follow links in path */
+#define OPEN_TRUNC     0x00200 /* Clear (truncate) the file */
 
 /*
  * Describes the type of the file

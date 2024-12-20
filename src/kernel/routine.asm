@@ -217,6 +217,7 @@ isr_stub_stack:
 
 	; Mimic what pusha does
 	mov edx, esp
+	add edx, [ebp+24]
 
 	; First half of the 'pusha' block
 	push dword 'SOEN' ; EAX

@@ -37,7 +37,7 @@ void start() {
 	cur_enable();
 
 	// Init memory system and make room for the kernel
-	mem_init(0xFFFFF + 1 /* TODO: remove when fix is merged */);
+	mem_init(0xFFFFF);
 
     ginit();
 
@@ -55,7 +55,6 @@ void start() {
 
 	vfs_init();
 
-	// for now mount /proc at /
 	FilesystemDriver procfs;
     procfs_load(&procfs);
     vfs_mount("/proc/", &procfs);
@@ -70,7 +69,7 @@ void start() {
 
     vRef root = vfs_root();
     vRef elf;
-    vfs_open(&elf, &root, "/executable/elf-pic", 0);
+    vfs_open(&elf, &root, "/executable/tiny", 0);
 
     scheduler_init();
 
