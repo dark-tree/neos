@@ -168,6 +168,10 @@ int scheduler_create_process(int parent_pid, vRef* processFile)
     image.prefix = 0;
 	image.sufix = INITIAL_STACK_SIZE;
 	int errorCode = elf_load(processFile, &image, true);
+
+	image.entry -= image.mount;
+	image.mount = 0; // FIXME
+
 	if(errorCode)
 	{
 		return 1;

@@ -365,6 +365,8 @@ static int sys_write(int fd, char* buffer, int bytes) {
 //		for (int i = 0; i < bytes; i ++) {
 //			con_write(buffer[i]);
 //		}
+//
+//		return 0;
 //	}
 
 	vRef* vref = fd_resolve(fd);
@@ -383,7 +385,6 @@ static int sys_read(int fd, char* buffer, int bytes) {
 	if (!vref) {
 		return -LINUX_EBADF;
 	}
-
 	return vfs_read(vref, buffer, bytes);
 }
 

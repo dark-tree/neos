@@ -2,6 +2,7 @@
 #include "types.h"
 #include "tables.h"
 #include "config.h"
+#include "kmalloc.h"
 
 #define EMPTY_GDT_ENTRY 0x000000000040F300
 #define EMPTY_CODE 0x000000000040FB00

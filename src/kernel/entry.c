@@ -69,7 +69,7 @@ void start() {
 
     vRef root = vfs_root();
     vRef elf;
-    vfs_open(&elf, &root, "/executable/a.out", 0);
+    vfs_open(&elf, &root, "/executable/tiny", 0);
 
     scheduler_init();
 
