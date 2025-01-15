@@ -65,10 +65,10 @@ isr_tail:
 	push eax
 
 	; Switch to kernel mode
-	push dword 1
-	push dword 2
-	call gdtr_switch
-	add esp, 8
+        ;push dword 1
+        ;push dword 2
+        ;call gdtr_switch
+        ;add esp, 8
 
 	; Interrupt error code
 	mov edx, [esp + 44]
@@ -154,7 +154,7 @@ isr_tail:
 	add esp, 4*8
 
 	; This alignes with the saved segments from before
-	call gdtr_switch
+        ;call gdtr_switch
 	add esp, 8
 
 	push ebx

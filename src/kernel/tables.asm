@@ -59,6 +59,8 @@ gdtr_store:
 	push ebp
 	mov ebp, esp
 
+        shl edx, 3
+
 	; Allocate space for the 6-byte-long GDTR on stack
 	sub esp, 6
 
@@ -67,7 +69,7 @@ gdtr_store:
 	mov dword [esp + 2], eax
 
 	; Switch to the new interupt table
-	lidt [esp]
+        lgdt [esp]
 
 	mov esp, ebp
 	pop ebp

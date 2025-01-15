@@ -184,7 +184,7 @@ int scheduler_create_process(int parent_pid, vRef* processFile)
 	void* stack = image.image + size;
 
 	uint32_t entrypoint = image.image + image.entry + image.prefix;
-	int segment = 1;// gput(0, 0xFFFFFFFF);
+    int segment = gput(0, 0xFFFFF);
 
 	stack = isr_stub_stack(stack, entrypoint, segment + 1, segment, 0);
 
