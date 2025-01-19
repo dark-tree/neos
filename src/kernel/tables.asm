@@ -81,21 +81,21 @@ gdtr_store:
 gdtr_switch:
 
 	; Those two registers need not be preserved as per CDECL
-	mov edx, [esp + 8] ; Code segment index
+        mov edx, [esp + 8] ; Code segment index
 	mov eax, [esp + 4] ; Data segment index
 
 	; Shift indices left by 3 bits so that RPL and TI are both 0
-	shl edx, 3
+        shl edx, 3
 	shl eax, 3
 
 	; Point all the 'data' segments at the data GDT entry
 	mov ds, ax
-	mov ss, ax
+
 	mov es, ax
 	mov fs, ax
 	mov gs, ax
 
-	; Commence SpoOoOoky Witchcraft :D
-	push dword edx
-	push dword [esp + 4]
-	retf 4
+        ; Commence SpoOoOoky Witchcraft :D
+        push dword edx
+        push dword [esp + 4]
+        retf 4

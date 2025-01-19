@@ -20,6 +20,7 @@ typedef struct {
 	vRef exe;
     uint32_t mount;
     int processSegmentsIndex;
+    int tr;
 } ProcessDescriptor;
 
 extern int scheduler_get_current_pid();

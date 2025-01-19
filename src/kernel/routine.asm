@@ -64,11 +64,13 @@ isr_tail:
 	shr ax, 3
 	push eax
 
-	; Switch to kernel mode
-        ;push dword 1
-        ;push dword 2
-        ;call gdtr_switch
-        ;add esp, 8
+        ; Complete the switch to kernel mode
+
+        mov ax, 10h
+        mov ds, ax
+        mov es, ax
+        mov fs, ax
+        mov gs, ax
 
 	; Interrupt error code
 	mov edx, [esp + 44]
@@ -154,7 +156,7 @@ isr_tail:
 	add esp, 4*8
 
 	; This alignes with the saved segments from before
-        ;call gdtr_switch
+        call isr_gdt_switch
 	add esp, 8
 
 	push ebx
@@ -168,6 +170,32 @@ isr_tail:
 	add esp, 8
 
 	iret
+
+
+
+isr_gdt_switch:
+
+        ; Those two registers need not be preserved as per CDECL
+        mov eax, [esp + 4] ; Data segment index
+
+        ; Shift indices left by 3 bits so that RPL and TI are both 0
+        shl eax, 3
+        mov edx, 16
+        cmp eax, edx
+        je igs_skip_adding
+
+        add eax, 3
+
+        igs_skip_adding:
+        ; Point all the 'data' segments at the data GDT entry
+        mov ds, ax
+
+        mov es, ax
+        mov fs, ax
+        mov gs, ax
+
+        ret
+
 
 
 isr_into_stack:

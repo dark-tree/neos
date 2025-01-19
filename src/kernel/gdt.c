@@ -7,6 +7,7 @@
 
 #define EMPTY_GDT_ENTRY 0x0000000000C0F300
 #define EMPTY_CODE 0x0000000000C0FB00
+#define EMPTY_TSS 0x0000000000008900
 
 uint64_t* gdt;
 
@@ -82,10 +83,10 @@ void ginit()
 }
 
 
-int gput(uint32_t offset, uint32_t size)
+int gput(uint32_t offset, uint32_t size, uint32_t tss_pointer)
 {
     //size = size>>10;
-    for(int i=3;i<GDT_SIZE+1;i+=2)
+    for(int i=3;i<GDT_SIZE+1;i+=3)
     {
         if(gdt[i] == dwswap(EMPTY_GDT_ENTRY) || gdt[i] == dwswap(EMPTY_CODE))
         {
@@ -96,6 +97,10 @@ int gput(uint32_t offset, uint32_t size)
             data = data | mask;
             gdt[i] = dwswap(code);
             gdt[i+1] = dwswap(data);
+            uint64_t tss_mask = set_gdt_field_mask(tss_pointer, 103);
+            uint64_t tss_selector = EMPTY_TSS;
+            tss_selector = tss_selector | tss_mask;
+            gdt[i+2] = dwswap(tss_selector);
             return i;
         }
     }
@@ -105,6 +110,7 @@ void grm(int i)
 {
     gdt[i] = dwswap(EMPTY_CODE);
     gdt[i+1] = dwswap(EMPTY_GDT_ENTRY);
+    gdt[i+2] = dwswap(EMPTY_GDT_ENTRY);
 }
 
 void gad(int i, uint32_t offset, uint32_t size)

@@ -7,6 +7,7 @@
 #include "rivendell.h"
 #include "tables.h"
 #include "gdt.h"
+#include "switch.h"
 
 
 ProcessDescriptor* general_process_table;
@@ -95,7 +96,7 @@ void scheduler_init()
 }
 
 
-void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vRef* exe, uint32_t mount, int processSegmentIndex)
+void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vRef* exe, uint32_t mount, int processSegmentIndex, int tr)
 {
 	int index = 0;
 	while(index!=process_count && general_process_table[index].exists!=false)
@@ -121,6 +122,7 @@ void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vR
 	new_entry->exe = *exe;
     new_entry->mount = mount;
     new_entry->processSegmentsIndex = processSegmentIndex;
+    new_entry->tr = tr;
 
 	// TODO set this to some better value
 	new_entry->cwd = vfs_root();
@@ -184,11 +186,25 @@ int scheduler_create_process(int parent_pid, vRef* processFile)
 	void* stack = image.image + size;
 
 	uint32_t entrypoint = image.image + image.entry + image.prefix;
-    int segment = gput(0, 0xFFFFF);
 
-    stack = isr_stub_stack(stack, entrypoint, segment + 1, segment, 0, stack);
 
-	scheduler_new_entry(parent_pid, stack, image.image, processFile, image.mount, segment);
+    void* interrupt_stack = kmalloc(INITIAL_STACK_SIZE);
+
+    uint32_t* tss = (uint32_t*)interrupt_stack;
+
+    interrupt_stack+=INITIAL_STACK_SIZE;
+
+    tss[1]=interrupt_stack;
+    tss[2]=16;
+
+
+    int segment = gput(0, 0xFFFFF, tss);
+
+
+
+    interrupt_stack = isr_stub_stack(interrupt_stack, entrypoint, segment + 1, segment, 0, stack);
+
+    scheduler_new_entry(parent_pid, interrupt_stack, image.image, processFile, image.mount, segment, segment+2);
 
 	kprintf("New process at: %0.8x, entry: %0.8x\n", image.image, entrypoint);
 
@@ -221,6 +237,7 @@ int scheduler_context_switch(void* old_stack)
 		process_running=0;
 	}
 
+    tr_switch(general_process_table[process_running].tr);
 //	kprintf(" * to: %d\n", process_running);
 //	kprintf(" * stack: %d\n", general_process_table[process_running].stack);
 
