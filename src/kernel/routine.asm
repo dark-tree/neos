@@ -196,6 +196,14 @@ isr_stub_stack:
 	mov ecx, [ebp+12] ; Load target instruction pointer
 	mov esp, [ebp+8]  ; Load target stack
 
+        mov eax, [ebp+16]
+        shl eax, 3
+        add eax, 3
+        push eax
+
+        mov eax, [ebp+28]
+        push eax
+
 	clc
 	cld
 
@@ -204,8 +212,10 @@ isr_stub_stack:
 	or dword [esp], 0x0200  ; Enable interrupts when we iret
 
 	; Code segment to return to
+        xor eax, eax
 	mov ax, [ebp+20] ; Code Segment
 	shl ax, 3
+        add eax, 3
 	push eax
 
 	; EIP will be restored from here after the interrupt
@@ -226,7 +236,7 @@ isr_stub_stack:
 	push dword 0xEBEB ; EBX
 
 	; ESP will be "restored" from here after the interrupt
-	push edx
+        push DWORD 0
 
 	; The rest of the pusha block
 	push dword 0xB1B1 ; EBP

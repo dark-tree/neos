@@ -5,8 +5,8 @@
 #include "kmalloc.h"
 #include "print.h"
 
-#define EMPTY_GDT_ENTRY 0x0000000000C09300
-#define EMPTY_CODE 0x0000000000C09B00
+#define EMPTY_GDT_ENTRY 0x0000000000C0F300
+#define EMPTY_CODE 0x0000000000C0FB00
 
 uint64_t* gdt;
 
