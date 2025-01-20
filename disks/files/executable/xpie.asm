@@ -7,22 +7,11 @@ section .data:
 
 section .text:
 
-_rip:
-	pop eax
-	mov ecx, eax
-	sub eax, 5
-	sub eax, _start
-	jmp ecx
-
 _start:
-
-	call _rip
-	push eax
-	add eax, path
-	mov ebx, eax
 
 	; sys_open
 	mov eax, 0x05
+	mov ebx, path
 	mov ecx, 0x442
 	mov edx, 0x180
 	int 0x80
@@ -30,12 +19,9 @@ _start:
 	; File Descriptor
 	mov ebx, eax
 
-	; Get pointer to "Hello World"
-	pop ecx
-	add ecx, hello
-
 	; sys_write
 	mov eax, 0x04
+	mov ecx, hello
 	mov edx, 13
 	int 0x80
 
