@@ -59,6 +59,7 @@ int scheduler_load_process_info(ProcessDescriptor* processInfo, int pid)
 	processInfo->exe = process->exe;
     processInfo->mount = process->mount;
     processInfo->processSegmentsIndex = process->processSegmentsIndex;
+    processInfo->gdt_base = process->gdt_base;
 	return 0;
 }
 
@@ -96,7 +97,7 @@ void scheduler_init()
 }
 
 
-void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vRef* exe, uint32_t mount, int processSegmentIndex, int tr)
+void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vRef* exe, uint32_t mount, int processSegmentIndex, int tr, uint32_t gdt_base)
 {
 	int index = 0;
 	while(index!=process_count && general_process_table[index].exists!=false)
@@ -123,6 +124,7 @@ void scheduler_new_entry(int parent_index, void* stack, void* process_memory, vR
     new_entry->mount = mount;
     new_entry->processSegmentsIndex = processSegmentIndex;
     new_entry->tr = tr;
+    new_entry->gdt_base = gdt_base;
 
 	// TODO set this to some better value
 	new_entry->cwd = vfs_root();
@@ -166,27 +168,16 @@ int scheduler_create_process(int parent_pid, vRef* processFile)
 	{
 		return 1;
 	}
+
 	ProgramImage image;
     image.prefix = 0;
 	image.sufix = INITIAL_STACK_SIZE;
 	int errorCode = elf_load(processFile, &image, true);
 
-	image.entry -= image.mount;
-	image.mount = 0; // FIXME
-
 	if(errorCode)
 	{
 		return 1;
 	}
-
-	// Size of the entire process memory
-	uint32_t size = kmsz(image.image);
-
-	// Pointer to the top of the physical stack (end of memory block)
-	void* stack = image.image + size;
-
-	uint32_t entrypoint = image.image + image.entry + image.prefix;
-
 
     void* interrupt_stack = kmalloc(INITIAL_STACK_SIZE);
 
@@ -197,14 +188,19 @@ int scheduler_create_process(int parent_pid, vRef* processFile)
     tss[1]=interrupt_stack;
     tss[2]=16;
 
+    uint32_t gdt_base = image.image-image.mount;
 
-    int segment = gput(0, 0xFFFFF, tss);
+    uint32_t size = kmsz(image.image);
 
+    void* stack = (image.mount + size) - gdt_base;
 
+    uint32_t entrypoint = image.entry + image.prefix;
+
+    int segment = gput(gdt_base, 0xFFFFF, tss);
 
     interrupt_stack = isr_stub_stack(interrupt_stack, entrypoint, segment + 1, segment, 0, stack);
 
-    scheduler_new_entry(parent_pid, interrupt_stack, image.image, processFile, image.mount, segment, segment+2);
+    scheduler_new_entry(parent_pid, interrupt_stack, image.image, processFile, image.mount, segment, segment+2, gdt_base);
 
 	kprintf("New process at: %0.8x, entry: %0.8x\n", image.image, entrypoint);
 
@@ -325,4 +321,9 @@ int scheduler_move_process(int pid, void* new_address)
     }
     general_process_table[pid-1].process_memory = new_address;
     return 0;
+}
+
+uint32_t scheduler_from_virtual(uint32_t virtual_address)
+{
+    return general_process_table[process_running].gdt_base + virtual_address;
 }

@@ -375,7 +375,7 @@ static int sys_write(int fd, char* buffer, int bytes) {
 		return -LINUX_EBADF;
 	}
 
-	return vfs_write(vref, buffer, bytes);
+    return vfs_write(vref, scheduler_from_virtual(buffer), bytes);
 }
 
 static int sys_read(int fd, char* buffer, int bytes) {
@@ -385,7 +385,7 @@ static int sys_read(int fd, char* buffer, int bytes) {
 	if (!vref) {
 		return -LINUX_EBADF;
 	}
-	return vfs_read(vref, buffer, bytes);
+    return vfs_read(vref, scheduler_from_virtual(buffer), bytes);
 }
 
 static int sys_open(const char* filename, int flags, int mode) {
@@ -395,7 +395,7 @@ static int sys_open(const char* filename, int flags, int mode) {
 	// mode is ignored by our glorious NEOS kernel, who needs permissions anyway?
 	(void) mode;
 
-	return fd_open(&cwd, filename, flags);
+    return fd_open(&cwd, scheduler_from_virtual(filename), flags);
 }
 
 static int sys_openat(int fd, const char* filename, int flags, int mode) {
@@ -409,12 +409,12 @@ static int sys_openat(int fd, const char* filename, int flags, int mode) {
 	// mode is ignored by our glorious NEOS kernel, who needs permissions anyway?
 	(void) mode;
 
-	return fd_open(vref, filename, flags);
+    return fd_open(vref, scheduler_from_virtual(filename), flags);
 
 }
 
 static int sys_creat(const char* pathname, int mode) {
-	return sys_open(pathname, OPEN_WRONLY | OPEN_CREAT | OPEN_WRONLY, mode);
+    return sys_open(scheduler_from_virtual(pathname), OPEN_WRONLY | OPEN_CREAT | OPEN_WRONLY, mode);
 }
 
 static int sys_lseek(unsigned int fd, int offset, unsigned int whence) {
@@ -433,7 +433,7 @@ static int sys_mkdir(const char* pathname, int mode) {
 	vRef cwd = fd_cwd();
 	(void) mode;
 
-	return vfs_mkdir(&cwd, pathname);
+    return vfs_mkdir(&cwd, scheduler_from_virtual(pathname));
 }
 
 static int sys_mkdirat(int fd, const char* pathname, int mode) {
@@ -445,14 +445,14 @@ static int sys_mkdirat(int fd, const char* pathname, int mode) {
 
 	(void) mode;
 
-	return vfs_mkdir(parent, pathname);
+    return vfs_mkdir(parent, scheduler_from_virtual(pathname));
 }
 
 static int sys_readlink(const char* path, char* buf, int size) {
 
 	vRef cwd = fd_cwd();
 
-	return vfs_readlink(&cwd, path, buf, size);
+    return vfs_readlink(&cwd, scheduler_from_virtual(path), scheduler_from_virtual(buf), size);
 }
 
 static int sys_getdents(unsigned int fd, struct linux_dirent* buffer, unsigned int size) {
@@ -499,7 +499,7 @@ static int sys_getdents(unsigned int fd, struct linux_dirent* buffer, unsigned i
 		}
 
 		// next entry pointer
-		struct linux_dirent* dirent = ((void*) buffer) + bytes;
+        struct linux_dirent* dirent = ((void*) scheduler_from_virtual(buffer)) + bytes;
 
 		dirent->d_ino = 0; // inode
 		dirent->d_off = entry.seek_offset;
@@ -561,7 +561,7 @@ static int sys_getdents64(unsigned int fd, struct linux_dirent64* buffer, unsign
 		}
 
 		// next entry pointer
-		struct linux_dirent64* dirent = ((void*) buffer) + bytes;
+        struct linux_dirent64* dirent = ((void*) scheduler_from_virtual(buffer)) + bytes;
 
 		dirent->d_ino = 0; // inode
 		dirent->d_off = entry.seek_offset;
@@ -620,7 +620,7 @@ static int sys_old_readdir(unsigned int fd, struct old_linux_dirent* buffer, uns
 		}
 
 		// next entry pointer
-		struct old_linux_dirent* dirent = ((void*) buffer) + bytes;
+        struct old_linux_dirent* dirent = ((void*) scheduler_from_virtual(buffer)) + bytes;
 
 		dirent->d_ino = 0; // inode
 		dirent->d_offset = entry.seek_offset;
@@ -636,39 +636,39 @@ static int sys_old_readdir(unsigned int fd, struct old_linux_dirent* buffer, uns
 }
 
 static int sys_stat(const char* filename, struct __old_kernel_stat* statbuf) {
-	return stat(filename, statbuf, (vStatMapper) vstat_to_linux_old, /* Do follow links */ 0);
+    return stat(scheduler_from_virtual(filename), scheduler_from_virtual(statbuf), (vStatMapper) vstat_to_linux_old, /* Do follow links */ 0);
 }
 
 static int sys_fstat(unsigned int fd, struct __old_kernel_stat* statbuf) {
-	return fstat(fd, statbuf, (vStatMapper) vstat_to_linux_old);
+    return fstat(fd, scheduler_from_virtual(statbuf), (vStatMapper) vstat_to_linux_old);
 }
 
 static int sys_lstat(const char* filename, struct __old_kernel_stat* statbuf) {
-	return stat(filename, statbuf, (vStatMapper) vstat_to_linux_old, OPEN_NOFOLLOW);
+    return stat(scheduler_from_virtual(filename), scheduler_from_virtual(statbuf), (vStatMapper) vstat_to_linux_old, OPEN_NOFOLLOW);
 }
 
 static int sys_newstat(const char* filename, struct stat* statbuf) {
-	return stat(filename, statbuf, (vStatMapper) vstat_to_linux_32, /* Do follow links */ 0);
+    return stat(scheduler_from_virtual(filename), scheduler_from_virtual(statbuf), (vStatMapper) vstat_to_linux_32, /* Do follow links */ 0);
 }
 
 static int sys_newlstat(const char* filename, struct stat* statbuf) {
-	return stat(filename, statbuf, (vStatMapper) vstat_to_linux_32, OPEN_NOFOLLOW);
+    return stat(scheduler_from_virtual(filename), scheduler_from_virtual(statbuf), (vStatMapper) vstat_to_linux_32, OPEN_NOFOLLOW);
 }
 
 static int sys_newfstat(unsigned int fd, struct stat* statbuf) {
-	return fstat(fd, statbuf, (vStatMapper) vstat_to_linux_32);
+    return fstat(fd, scheduler_from_virtual(statbuf), (vStatMapper) vstat_to_linux_32);
 }
 
 static int sys_stat64(const char* filename, struct stat64* statbuf) {
-	return stat(filename, statbuf, (vStatMapper) vstat_to_linux_64, /* Do follow links */ 0);
+    return stat(scheduler_from_virtual(filename), scheduler_from_virtual(statbuf), (vStatMapper) vstat_to_linux_64, /* Do follow links */ 0);
 }
 
 static int sys_lstat64(const char* filename, struct stat64* statbuf) {
-	return stat(filename, statbuf, (vStatMapper) vstat_to_linux_64, OPEN_NOFOLLOW);
+    return stat(scheduler_from_virtual(filename), scheduler_from_virtual(statbuf), (vStatMapper) vstat_to_linux_64, OPEN_NOFOLLOW);
 }
 
 static int sys_fstat64(unsigned long fd, struct stat64* statbuf) {
-	return fstat(fd, statbuf, (vStatMapper) vstat_to_linux_64);
+    return fstat(fd, scheduler_from_virtual(statbuf), (vStatMapper) vstat_to_linux_64);
 }
 
 static int sys_close(unsigned int fd) {
@@ -703,7 +703,7 @@ static int sys_unlinkat(int fd, const char* pathname, int flag) {
 	vRef vref;
 	int res = 0;
 
-	if (res = vfs_open(&vref, parent, pathname, OPEN_NOFOLLOW | (flag ? OPEN_DIRECTORY : 0))) {
+    if (res = vfs_open(&vref, parent, scheduler_from_virtual(pathname), OPEN_NOFOLLOW | (flag ? OPEN_DIRECTORY : 0))) {
 		return res;
 	}
 
@@ -726,7 +726,7 @@ static int sys_unlink(const char* pathname) {
 	vRef vref;
 	int res = 0;
 
-	if (res = vfs_open(&vref, &cwd, pathname, OPEN_NOFOLLOW)) {
+    if (res = vfs_open(&vref, &cwd, scheduler_from_virtual(pathname), OPEN_NOFOLLOW)) {
 		return res;
 	}
 
@@ -749,7 +749,7 @@ static int sys_rmdir(const char* pathname) {
 	vRef vref;
 	int res = 0;
 
-	if (res = vfs_open(&vref, &cwd, pathname, OPEN_DIRECTORY | OPEN_NOFOLLOW)) {
+    if (res = vfs_open(&vref, &cwd, scheduler_from_virtual(pathname), OPEN_DIRECTORY | OPEN_NOFOLLOW)) {
 		return res;
 	}
 
@@ -771,7 +771,7 @@ static int sys_chdir(const char* path) {
 	vRef vref;
 	int res = 0;
 
-	if (res = vfs_open(&vref, &cwd, path, OPEN_DIRECTORY)) {
+    if (res = vfs_open(&vref, &cwd, scheduler_from_virtual(path), OPEN_DIRECTORY)) {
 		return res;
 	}
 
@@ -784,10 +784,11 @@ static int sys_chdir(const char* path) {
 }
 
 static int sys_getcwd(char* buf, unsigned long size) {
+    buf = scheduler_from_virtual(buf);
 	ProcessDescriptor process;
 	int caller = scheduler_get_current_pid();
 	scheduler_load_process_info(&process, caller);
-	vfs_trace(&process.cwd, buf, size);
+    vfs_trace(&process.cwd, buf, size);
 	return (int) buf;
 }
 
@@ -796,6 +797,7 @@ static int sys_getpid() {
 }
 
 static int sys_uname(struct old_utsname* uname) {
+    uname = scheduler_from_virtual(uname);
 	strcpy(uname->sysname, "NEOS");
 	strcpy(uname->nodename, "neos");
 	strcpy(uname->release, "0.0.1");
@@ -805,6 +807,7 @@ static int sys_uname(struct old_utsname* uname) {
 }
 
 static int sys_olduname(struct oldold_utsname* uname) {
+    uname = scheduler_from_virtual(uname);
 	strcpy(uname->sysname, "NEOS");
 	strcpy(uname->nodename, "neos");
 	strcpy(uname->release, "0.0.1");
@@ -814,6 +817,7 @@ static int sys_olduname(struct oldold_utsname* uname) {
 }
 
 static int sys_newuname(struct new_utsname* uname) {
+    uname = scheduler_from_virtual(uname);
 	strcpy(uname->sysname, "NEOS");
 	strcpy(uname->nodename, "neos");
 	strcpy(uname->release, "0.0.1");

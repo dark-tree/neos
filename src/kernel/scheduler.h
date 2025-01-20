@@ -21,6 +21,7 @@ typedef struct {
     uint32_t mount;
     int processSegmentsIndex;
     int tr;
+    uint32_t gdt_base;
 } ProcessDescriptor;
 
 extern int scheduler_get_current_pid();
@@ -48,3 +49,6 @@ int scheduler_fput(int pid, vRef vref);
 vRef* scheduler_fget(int pid, int fd);
 
 int scheduler_fremove(int pid, int fd);
+
+uint32_t scheduler_from_virtual(uint32_t virtual_address);
+
