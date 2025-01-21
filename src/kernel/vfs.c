@@ -174,7 +174,7 @@ bool vfs_isreadable(int open_flags) {
 
 int vfs_open(vRef* vref, vRef* relation, const char* path, uint32_t flags) {
 
-	kprintf("vfs_open: '%s'\n", path);
+    kprintf("vfs_open: '%s'\n", path);
 
 	bool enter = false;
 	char front[FILE_MAX_NAME];

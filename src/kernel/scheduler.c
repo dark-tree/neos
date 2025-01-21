@@ -215,7 +215,7 @@ int scheduler_context_switch(void* old_stack)
 	{
 		return (int) old_stack;
 	}
-
+    int old_process_running = process_running;
 //	kprintf("context switch:\n");
 //	kprintf(" * stack: %d\n", general_process_table[process_running].stack);
 //	kprintf(" * from: %d\n", process_running);
@@ -233,9 +233,12 @@ int scheduler_context_switch(void* old_stack)
 		process_running=0;
 	}
 
-    tr_switch(general_process_table[process_running].tr);
-//	kprintf(" * to: %d\n", process_running);
-//	kprintf(" * stack: %d\n", general_process_table[process_running].stack);
+    if(old_process_running!=process_running)
+    {
+         tr_switch(general_process_table[process_running].tr);
+    }
+    //kprintf(" * to: %d\n", process_running);
+    //kprintf(" * stack: %d\n", general_process_table[process_running].stack);
 
 	return (int) general_process_table[process_running].stack;
 }
